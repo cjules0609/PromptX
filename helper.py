@@ -236,7 +236,6 @@ def save_data(jet, wind, theta_los, path='./', model_id=0):
         writer = csv.writer(file)
         if model_id == 1 or model_id == 2:
             writer.writerow(['jet_t', 'jet_L_gamma', 'jet_L_X', 'wind_t', 'wind_L_X'])
-            print(jet.t.shape)
             for i in range(jet.t.shape[0]):
                 writer.writerow([jet.t[i], jet.L_gamma_tot[i], jet.L_X_tot[i], wind.engine.t[i], wind.L_X_tot[i]])
         elif model_id == 3 or model_id == 4: 

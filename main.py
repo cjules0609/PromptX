@@ -2,6 +2,7 @@ import numpy as np
 
 from const import *
 from helper import *
+from burst import *
 import os
 
 def main(n_theta=500, n_phi=100, jet_E_iso=1e53, jet_eps0=1e53,
@@ -289,7 +290,7 @@ class Jet:
 
         # Sum the observed energy of emitting regions
         self.S_obs = np.sum(np.where(np.isfinite(S) & (self.eps > 0), S * R_D**3 * self.dOmega, 0))
-        # print('Observed total energy:', self.S_obs)
+        print('Observed total energy:', self.S_obs)
 
 class Wind(Magnetar):
     """
@@ -605,6 +606,7 @@ if __name__ == '__main__':
     
         jet_E_iso = E_gamma / (1 - np.cos(theta_c))
 
+        print('#----------------------Normalizing Jet w/ theta_c = {}------------------------#'.format(round(np.rad2deg(theta_c))))
         jet = Jet(E_iso=jet_E_iso, eps0=jet_E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, struct=1)
         jet.normalize(jet.eps0)
         jet.observer(theta_los=0, phi_los=0)
@@ -614,5 +616,5 @@ if __name__ == '__main__':
         wind.observer(theta_los=0, phi_los=0)
  
         for theta_los in theta_los_list:
-            print('#----------------------{}------------------------#'.format(np.rad2deg(theta_los)))
+            print('#----------------------theta_v = {}------------------------#'.format(round(np.rad2deg(theta_los))))
             main(n_theta=n_theta, n_phi=n_phi, jet_E_iso=jet_E_iso, jet_eps0=jet_eps0, theta_c=theta_c, theta_cut=theta_cut, wind_norm=wind.eps_prime_los, theta_los=theta_los, phi_los=phi_los, model_id=model_id)
