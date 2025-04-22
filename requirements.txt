@@ -1,0 +1,7 @@
+# Python version
+python_version >= 3.7
+
+# Core dependencies
+numpy>=1.18
+matplotlib>=3.1
+scipy>=1.4
