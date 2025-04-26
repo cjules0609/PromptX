@@ -1,5 +1,26 @@
+# ============================================================================= #
+#                  ____  ____   __   _  _  ____  ____  _  _                     #
+#                 (  _ \(  _ \ /  \ ( \/ )(  _ \(_  _)( \/ )                    #
+#                  ) __/ )   /(  O )/ \/ \ ) __/  )(   )  (                     #
+#                 (__)  (__\_) \__/ \_)(_/(__)   (__) (_/\_)                    #
+#                                                                               #
+# ============================================================================= #
+#   PromptX - Prompt X-ray emission modeling of relativistic outflows           #
+#   Version 1.0                                                                 #
+#   Author: Connery Chen, Yihan Wang, and Bing Zhang                            #
+#   License: MIT                                                                #
+# ============================================================================= # 
+
 import numpy as np
 import csv
+
+from const import *
+
+def gamma2beta(gamma):
+    return np.sqrt(1 - 1 / gamma**2)
+
+def beta2gamma(beta):
+    return 1 / np.sqrt(1 - beta**2)
 
 def gaussian(x, sigma, mu=0):
     """
@@ -82,6 +103,21 @@ def fred(t, tau_1, tau_2):
         array: FRED light curve evaluated at each time point.
     """
     return np.array(np.exp(2 * (tau_1 / tau_2) ** 0.5) / np.exp(tau_1 / t + t / tau_2))
+
+def impulse(t, t_peak, width=1e-3):
+    """
+    Models an impulse function centered at `t_peak` with a given width.
+    
+    Parameters:
+        t (array): Time grid.
+        t_peak (float): Time at which the impulse occurs.
+        width (float): Width of the Gaussian impulse (small value for sharpness).
+    
+    Returns:
+        array: The impulse-like function at each time step.
+    """
+    # Narrow Gaussian to simulate an impulse (width determines sharpness)
+    return np.exp(-0.5 * ((t - t_peak) / width) ** 2)
 
 def angular_d(theta_1, theta_2, phi_1, phi_2):
     """
@@ -218,14 +254,45 @@ def interp_lc(t, L):
 
     return t_common, L_total
 
-def save_data(jet, wind, theta_los, path='./', model_id=0):
+def interp_spec(E, N):
+    """
+    Interpolate spectra over a common energy grid and sum contributions.
+
+    Args:
+        E (array): Energy values for spectra (e.g. in keV), shape (..., n_E).
+        N (array): Photon number spectra (e.g. dN/dE), same shape as E.
+
+    Returns:
+        tuple: Interpolated energy grid and total interpolated spectrum.
+    """
+    E_common = np.geomspace(1e2, 1e6, 1000)  # adjust as needed for your energy band
+    N_total = np.zeros_like(E_common)
+
+    E_flat = E.reshape(-1, E.shape[-1])
+    N_flat = N.reshape(-1, N.shape[-1])
+
+    for E_ij, N_ij in zip(E_flat, N_flat):
+        if np.all(np.isfinite(E_ij)) and np.any(N_ij > 0):
+            mask = (N_ij > 0) & np.isfinite(E_ij)
+            E_valid = E_ij[mask]
+            N_valid = N_ij[mask]
+
+            if len(E_valid) > 1:
+                N_interp = np.interp(E_common, E_valid, N_valid, left=0.0, right=0.0)
+                N_total += N_interp
+
+    return E_common, N_total
+
+
+def save_data(jet, wind, theta_los, phi_los, path='./', model_id=0):
     """
     Save time series data of jet and wind to a CSV file.
 
     Args:
         jet (object): Jet object.
         wind (object): Wind object.
-        theta_los (float): Line-of-sight angle in radians.
+        theta_los (float): Line-of-sight polar angle in radians.
+        phi_los (float): Line-of-sight azimuthal angle in radians.
         path (str): Directory path to save the CSV file.
         model_id (int): Determines how to handle data (1-4).
 
@@ -243,3 +310,172 @@ def save_data(jet, wind, theta_los, path='./', model_id=0):
             for i in range(jet.t.shape[0]):
                 writer.writerow([jet.t[i], jet.L_gamma_tot[i], jet.L_X_tot[i]])
     return
+
+def coord_grid(n_theta, n_phi, theta_bounds, phi_bounds):
+    """
+    Generates a grid of spherical coordinates (theta, phi).
+
+    Args:
+        n_theta (int): Number of theta (polar angle) grid points.
+        n_phi (int): Number of phi (azimuthal angle) grid points.
+        theta_bounds (list or tuple): Range of theta (polar angle) values [theta_min, theta_max] in radians.
+        phi_bounds (list or tuple): Range of phi (azimuthal angle) values [phi_min, phi_max] in radians.
+
+    Returns:
+        tuple: theta (columns) and phi (rows) meshgrids.
+    """
+    # Generate theta values: cosine transformation for tighter spacing at N x pi for N = [0, 1, 2, ...]
+    theta = -np.cos(np.linspace(theta_bounds[0], theta_bounds[1], n_theta)) * np.pi / 2 + np.pi / 2
+
+    # Create meshgrid for spherical coordinates (theta, phi)
+    theta, phi = np.meshgrid(theta, np.linspace(phi_bounds[0], phi_bounds[1], n_phi))
+    return theta, phi
+
+
+def gamma_grid(k, theta, struct='gaussian', cutoff=np.pi):
+    """
+    Generates grid of Lorentz factors based on given structure type and parameters.
+
+    Args:
+        k (float): Parameter that influences shape.
+        theta (2D array): Meshgrid of theta (polar angle) values, typically generated by `coord_grid`.
+        struct (str): Structure type, either 'gaussian' or 'pl' (power-law).
+        cutoff (float): Cutoff angle beyond which Gamma = 1.
+
+    Returns:
+        2D array: Grid of Lorentz factors corresponding to provided structure.
+    """
+    # Select the appropriate structure type and calculate gamma values
+    if struct == 'gaussian':
+        g = gaussian(theta[:, :theta.shape[1]], k)
+    elif struct == 'pl':
+        g = powerlaw(theta[:, :theta.shape[1]], k)
+    else:
+        # Error handling for unsupported structure types
+        print('struct must be gaussian or pl')
+        return None
+
+    # Set Gamma = 1 beyond cutoff
+    g[np.abs(np.cos(theta)) < np.cos(cutoff)] = 1
+
+    # Ensure Gamma >= 1
+    g[g < 1] = 1
+
+    return g
+
+
+def eps_grid(eps0, k, theta, struct='gaussian', cutoff=np.pi):
+    """
+    Generates grid of energy per solid angle (eps) based on given structure type and parameters.
+
+    Args:
+        eps0 (float): Scaling factor for energy per solid angle.
+        k (float): Parameter that influences shape.
+        theta (2D array): Meshgrid of theta (polar angle) values, typically generated by `coord_grid`.
+        struct (str): Structure type, either 'gaussian' or 'pl' (power-law).
+        cutoff (float): Cutoff angle beyond which the eps = 0.
+
+    Returns:
+        2D array: Grid of energy per solid angle (eps) values corresponding to provided structure.
+    """
+    # Select appropriate structure type and calculate energy per solid angle
+    if struct == 'gaussian':
+        eps = gaussian(theta[:, :theta.shape[1]], k)
+    elif struct == 'pl':
+        eps = powerlaw(theta[:, :theta.shape[1]], k)
+    else:
+        # Error handling for unsupported structure types
+        print('struct must be gaussian or pl')
+        return None
+
+    # Set eps = 0 for angles beyond cutoff
+    eps[np.abs(np.cos(theta)) < np.cos(cutoff)] = 0
+
+    return eps0 * eps
+
+# on-grid observables
+def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
+    """
+    Computes the spectrum and light curve observed by an observer on a grid.
+    
+    Args:
+        eps (2D array): Energy per solid angle (eps) grid values.
+        R_D (2D array): Doppler factor grid values.
+        R_D_onaxis (2D array): Doppler factor for the on-axis observer.
+        e_1 (float): Minimum energy for the spectrum integration, default is 0.3 keV.
+        e_2 (float): Maximum energy for the spectrum integration, default is 10 keV.
+
+    Returns:
+        tuple: Contains the following:
+            - E (array): Energy grid used for the spectrum.
+            - N_E_norm (array): Normalized Band spectrum.
+            - t_obs (array): Time grid adjusted to the observer frame.
+            - L_scaled (array): Scaled light curve.
+            - S (array): Integrated spectrum over the detector energy band.
+    """
+    # SPECTRUM
+    # Reference Band function parameters
+    alpha, beta = -1, -2.3
+    E_p_0 = 1e6 
+
+    # Calculate the peak and cutoff energy based on the Amati relation
+    E_p = E_p_0 * (e_iso_grid / e_iso_grid[0])**amati_index
+    # E_p = 1e5 * 10**(0.83 + 0.41 * np.log10(e_iso_grid / 1e51))
+    # [print(f'E_p: {ep}, E_iso: {eiso}') for e p, eiso in zip(E_p, e_iso_grid)]
+
+    E_0 = E_p / (2 + alpha)
+
+    # Define the energy grid for the spectrum integration
+    E = np.geomspace(1e2, 1e6, 1000)
+
+    # Compute the unnormalized Band spectrum
+    N_E = band(E, alpha, beta, E_0)
+
+    # Normalize spectrum to eps
+    # This is the spectrum an on-grid observer would see
+    eps_unit = int_spec(E, N_E, E_min=10e3, E_max=1e6)
+    A_spec = eps / eps_unit
+    N_E_norm = A_spec[..., np.newaxis] * N_E 
+
+    # Integrate spectra of emitting regions over detector energy band
+    S = int_spec(E, N_E_norm, E_min=e_1, E_max=e_2)
+    S = np.nan_to_num(S, nan=0.0)
+
+    # LIGHT CURVE
+    # FRED function parameters
+    a_1 = 0.05
+    a_2 = 0.15
+
+    # Generate FRED light curve
+    t = np.geomspace(1e-3, 1e3, 1000)
+    L = fred(t, a_1, a_2)
+    
+    # t_peak = 1e-2
+    # t = np.geomspace(t_peak/10, t_peak*10, 100)
+    # L = impulse(t, t_peak, width=1e-3) 
+
+    # Normalize time-integrated Luminosity
+    S_unit = int_lc(t, L)
+    A_lc = S / S_unit
+    L_scaled = A_lc[..., np.newaxis] * L 
+
+    return E, N_E_norm, t, L_scaled, S
+
+def e_iso_grid(theta, phi, g, eps, dOmega):
+    """
+    Computes the isotropic equivalent energy (E_iso) for a grid of angles.
+    """
+
+    E_iso_grid = np.zeros_like(theta[0])
+
+    # Loop over each theta (phi-independent)
+    for i_theta in range(len(theta[0])):
+        theta_los = theta[0, i_theta]
+        D_on = doppf(g, 0)
+        D_off = doppf(g, angular_d(theta[0, i_theta], theta, phi[0, 0], phi))
+        R_D = D_off / D_on        
+
+        # Energy observed at this grid point
+        E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**3 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**2 * dOmega[eps > 0])
+        E_iso_grid[i_theta] = E_iso  # Store the calculated E_iso for each grid point
+    return E_iso_grid
