@@ -1,9 +1,9 @@
 # PromptX
-Prompt X-ray counterparts of neutron star mergers for any observer
+Prompt X-ray counterparts of neutron star mergers for structured relativistic outflows calculated for any observer
 
 ## Project Description
 
-This project simulates the emission from relativistic gamma-ray burst (GRB) jets and magnetar-central-engine-powereed X-ray winds, taking into account the structure of the jets and observer viewing angles. The goal is to model jet and wind emission viewed from arbitrary lines of sight, with a focus on calculating the observed light curves and spectra in X-rays. The code integrates emission profiles over solid angles, normalizes the energy distribution to match a fixed isotropic-equivalent energy (E_iso), and applies Doppler boosting to compute observer-frame quantities.
+This project simulates the emission from relativistic outflows (i.e., gamma-ray burst (GRB) jets and magnetar-central-engine-powereed X-ray winds), using phenomenological light curve and spectral models. It takes into account gaussian, power-law and tophat outflows and calculates observed properties from any viewing angle. The code integrates emission profiles over solid angles, normalizes the energy distribution to match a fixed isotropic-equivalent energy (E_iso), and applies Doppler boosting to compute observer-frame quantities. The main goal is to model jet and wind X-ray emission launched during and after neutron star mergers.
 
 The main components of the simulation include:
 
