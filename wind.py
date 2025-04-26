@@ -130,15 +130,3 @@ class Wind(Magnetar):
         E_max = 1e6
         alpha = -1.5
         beta = -3
-
-        # On-axis spectrum
-        self.E_on=np.geomspace(E_min, E_max, 200)
-        self.N_E_on, self.A_on = spec(norm, E=self.E_on, E_p=E_p, E_det=np.geomspace(0.4e3, 5e3, 200), alpha=alpha, beta=beta) if theta_los > self.theta_cut else [0, 0]
-        
-        # LOS spectrum (same shape)
-        self.E_los=np.geomspace(E_min, E_max, 200)
-        self.N_E_los, self.A_los = spec(norm, E=self.E_los, E_p=E_p, E_det=np.geomspace(0.4e3, 5e3, 200), alpha=alpha, beta=beta) if theta_los > self.theta_cut else [0, 0]
-
-        # Doppler-boosted spectrum (adjust E_p)
-        self.E_dopp = np.geomspace(E_min, E_max, 200)
-        self.N_E_dopp, self.A_dopp = spec(self.eps_prime_los, E=self.E_dopp, E_p=E_p * (self.r_eps)**0.5, E_det=np.geomspace(0.4e3, 5e3, 200), alpha=alpha, beta=beta)
