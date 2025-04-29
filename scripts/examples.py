@@ -18,8 +18,8 @@ import matplotlib.colors as mcolors
 from matplotlib.patches import Rectangle
 from matplotlib.colors import LinearSegmentedColormap
 
-from helper import *
-from main import *
+from promptx.jet import Jet
+from promptx.wind import Wind
 
 plt.rcParams.update({'font.size': 12})
 
@@ -80,9 +80,6 @@ def plot_spec(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
 
     ax_spec.plot(jet.E, jet.spec_tot * jet.E**2, label=r'$\mathcal{R}_\mathcal{D}$ jet', lw=1, c='r')
 
-    if model_id in [1, 2]:
-        ax_spec.plot(wind.E_dopp, wind.A_dopp * wind.N_E_dopp * wind.E_dopp**2, label=r'$\mathcal{R}_\mathcal{D}$ wind', lw=1, c='b')
-
     ax_spec.set_xlabel(r'$E$ [eV]')
     ax_spec.set_ylabel(r'$E^2 N(E)$ [erg/s]')
     ax_spec.set_xlim([0.3e3, 1e6])
@@ -105,7 +102,7 @@ def plot_jet_lc_obs(jet, theta_los, phi_los, path='./out/'):
     jet.observer(theta_los=theta_los, phi_los=phi_los)
 
     plt.rcParams.update({'font.size': 12})
-    los_coord = nearest_coord(jet.theta, jet.phi, theta_los, phi_los)
+    los_coord = [np.abs(jet.theta[0, :] - theta_los).argmin(), np.abs(jet.phi[:, 0] - phi_los).argmin()]
 
     n_colors = 256
     cut = np.rad2deg(jet.theta_cut) / 90
@@ -174,7 +171,7 @@ def plot_jet_spec_obs(jet, theta_los, phi_los, path='./out/'):
     """
     jet.observer(theta_los=theta_los, phi_los=phi_los)
 
-    los_coord = nearest_coord(jet.theta, jet.phi, theta_los, phi_los)
+    los_coord = [np.abs(jet.theta[0, :] - theta_los).argmin(), np.abs(jet.phi[:, 0] - phi_los).argmin()]
 
     n_colors = 256
     cut = np.rad2deg(jet.theta_cut) / 90
@@ -275,8 +272,8 @@ wind = Wind(g0=50, n_theta=n_theta, n_phi=n_phi, theta_cut=theta_cut)
 wind.observer(theta_los=0, phi_los=0)
 
 # run an example!
-# plot_lc(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
-# plot_spec(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
+plot_lc(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
+plot_spec(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
 plot_jet_lc_obs(jet, theta_los, phi_los, path=path)
-# plot_jet_spec_obs(jet, theta_los, phi_los, path=path)
-# plot_E_iso_obs(jet, path=path)
+plot_jet_spec_obs(jet, theta_los, phi_los, path=path)
+plot_E_iso_obs(jet, path=path)

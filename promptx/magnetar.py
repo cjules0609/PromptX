@@ -11,8 +11,8 @@
 #   License: MIT                                                                #
 # ============================================================================= # 
 
-from helper import *
-from const import *
+from .helper import *
+from .const import *
 
 class Magnetar:
     """
@@ -26,12 +26,14 @@ class Magnetar:
         B_p (float): Dipole magnetic field strength [G]
         R (float): Radius of the neutron star [cm]
         eps (float): Ellipticity (dimensionless)
-        eta (float): Efficiency factor for energy conversion (unused here)
-        eos (dict): Equation of state parameters
-
-        t (np.ndarray): Time evolution [s]
-        Omega (np.ndarray): Spin frequency evolution [rad/s]
-        tau (np.ndarray): Optical depth over time
+        eos (dict): Dictionary containing the EOS parameters for the parameterization `(alpha * M_TOV) ** -beta`, where:
+            
+            - 'M_TOV' (float): Maximum mass of the neutron star in solar masses [M_sun].
+            - 'alpha' (float): Parameter affecting the density-pressure relationship.
+            - 'beta' (float): Exponent for the density dependence in the EOS.
+        t (array): Time evolution [s]
+        Omega (array): Spin frequency evolution [rad/s]
+        tau (array): Optical depth over time
         t_tau (float): Time when optical depth = 1
     """
 
@@ -48,7 +50,7 @@ class Magnetar:
 
         # Equation of state parameters
         self.eos = {
-            'M_TOV': 2.05,   # Maximum non-rotating NS mass [M_sun]
+            'M_TOV': 2.05,   # [M_sun]
             'alpha': 1.60,
             'beta': -2.75
         }

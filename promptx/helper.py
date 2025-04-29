@@ -14,12 +14,40 @@
 import numpy as np
 import csv
 
-from const import *
+from .const import *
 
 def gamma2beta(gamma):
+    """
+    Convert Lorentz factor to velocity factor.
+
+    Args:
+        gamma (float): Lorentz factor, must be greater than or equal to 1.
+
+    Returns:
+        float: Velocity factor (beta), between 0 and 1.
+
+    Raises:
+        ValueError: If gamma is less than 1.
+    """
+    if gamma < 1:
+        raise ValueError("Gamma must be greater than or equal to 1.")
     return np.sqrt(1 - 1 / gamma**2)
 
 def beta2gamma(beta):
+    """
+    Convert velocity factor to Lorentz factor.
+
+    Args:
+        beta (float): Velocity factor, must be between 0 and 1.
+
+    Returns:
+        float: Lorentz factor (gamma), greater than or equal to 1.
+
+    Raises:
+        ValueError: If beta is not in the range [0, 1).
+    """
+    if not (0 <= beta < 1):
+        raise ValueError("Beta must be in the range [0, 1).")
     return 1 / np.sqrt(1 - beta**2)
 
 def gaussian(x, sigma, mu=0):
@@ -92,7 +120,7 @@ def band(E, alpha, beta, E_0):
 
 def fred(t, tau_1, tau_2):
     """
-    FRED light curve function for temporal evolution.
+    Fast-rise-exponential-decay (FRED) model function for light curves.
 
     Args:
         t (array): Time values for the light curve.
@@ -393,23 +421,27 @@ def eps_grid(eps0, k, theta, struct='gaussian', cutoff=np.pi):
 
     return eps0 * eps
 
-# on-grid observables
 def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
     """
     Computes the spectrum and light curve observed by an observer on a grid.
-    
+
+    This function calculates the observed spectrum and light curve at each grid based on the intrinsic energy per solid angle grid 
+    (eps) and observed isotropic energy grid (e_iso_grid). It uses the Amati relation to determine the peak energy 
+    (E_p) of the Band spectra, each normalized such that the integral equals eps. The light curve at each grid is modeled 
+    using a FRED function, each normalized such that the integral equals eps.
+
     Args:
-        eps (2D array): Energy per solid angle (eps) grid values.
-        R_D (2D array): Doppler factor grid values.
-        R_D_onaxis (2D array): Doppler factor for the on-axis observer.
+        eps (2D array): Energy per solid angle grid values.
+        e_iso_grid (2D array): Isotropic energy grid values for each grid point.
+        amati_index (float): Amati relation index used to calculate the peak energy.
         e_1 (float): Minimum energy for the spectrum integration, default is 0.3 keV.
         e_2 (float): Maximum energy for the spectrum integration, default is 10 keV.
 
     Returns:
-        tuple: Contains the following:
-            - E (array): Energy grid used for the spectrum.
+        tuple: A tuple containing the following arrays:
+            - E (array): Energy grid used for the spectrum integration.
             - N_E_norm (array): Normalized Band spectrum.
-            - t_obs (array): Time grid adjusted to the observer frame.
+            - t (array): Time grid adjusted to the observer frame for the light curve.
             - L_scaled (array): Scaled light curve.
             - S (array): Integrated spectrum over the detector energy band.
     """
@@ -420,9 +452,6 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
 
     # Calculate the peak and cutoff energy based on the Amati relation
     E_p = E_p_0 * (e_iso_grid / e_iso_grid[0])**amati_index
-    # E_p = 1e5 * 10**(0.83 + 0.41 * np.log10(e_iso_grid / 1e51))
-    # [print(f'E_p: {ep}, E_iso: {eiso}') for e p, eiso in zip(E_p, e_iso_grid)]
-
     E_0 = E_p / (2 + alpha)
 
     # Define the energy grid for the spectrum integration
@@ -432,7 +461,6 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
     N_E = band(E, alpha, beta, E_0)
 
     # Normalize spectrum to eps
-    # This is the spectrum an on-grid observer would see
     eps_unit = int_spec(E, N_E, E_min=10e3, E_max=1e6)
     A_spec = eps / eps_unit
     N_E_norm = A_spec[..., np.newaxis] * N_E 
@@ -449,10 +477,6 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
     # Generate FRED light curve
     t = np.geomspace(1e-3, 1e3, 1000)
     L = fred(t, a_1, a_2)
-    
-    # t_peak = 1e-2
-    # t = np.geomspace(t_peak/10, t_peak*10, 100)
-    # L = impulse(t, t_peak, width=1e-3) 
 
     # Normalize time-integrated Luminosity
     S_unit = int_lc(t, L)
@@ -464,16 +488,30 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
 def e_iso_grid(theta, phi, g, eps, dOmega):
     """
     Computes the isotropic equivalent energy (E_iso) for a grid of angles.
-    """
 
+    This function calculates the isotropic equivalent energy (E_iso) observed by an observer at increments
+    of theta (assuming azimuthal symmetry). The energy is adjusted for the Doppler shift 
+    and the angular distribution of emission. The Doppler factor is computed for each grid point
+    based on the viewing angle, and the result is scaled according to the solid angle element `dOmega`.
+
+    Args:
+        theta (2D array): Array of polar angle (theta) values defining the grid.
+        phi (2D array): Array of azimuthal angle (phi) values defining the grid.
+        g (float): Lorentz factor, which is used to calculate the Doppler shift.
+        eps (2D array): Energy per solid angle grid values at each point in the grid.
+        dOmega (2D array): Solid angle element corresponding to each grid point.
+
+    Returns:
+        2D array: Isotropic equivalent energy (E_iso) at each grid point.
+    """
     E_iso_grid = np.zeros_like(theta[0])
 
     # Loop over each theta (phi-independent)
     for i_theta in range(len(theta[0])):
         theta_los = theta[0, i_theta]
-        D_on = doppf(g, 0)
-        D_off = doppf(g, angular_d(theta[0, i_theta], theta, phi[0, 0], phi))
-        R_D = D_off / D_on        
+        D_on = doppf(g, 0)  # Doppler factor for on-axis observer
+        D_off = doppf(g, angular_d(theta[0, i_theta], theta, phi[0, 0], phi))  # Doppler factor for off-axis observer
+        R_D = D_off / D_on  # Ratio of Doppler factors
 
         # Energy observed at this grid point
         E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**3 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**2 * dOmega[eps > 0])

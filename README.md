@@ -1,64 +1,63 @@
 # PromptX
-Prompt X-ray counterparts of neutron star mergers for structured relativistic outflows calculated for any observer
 
-## Project Description
+![Python Version](https://img.shields.io/badge/python-3.6%2B-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-This project simulates the emission from relativistic outflows (i.e., gamma-ray burst (GRB) jets and magnetar-central-engine-powereed X-ray winds), using phenomenological light curve and spectral models. It takes into account gaussian, power-law and tophat outflows and calculates observed properties from any viewing angle. The code integrates emission profiles over solid angles, normalizes the energy distribution to match a fixed isotropic-equivalent energy (E_iso), and applies Doppler boosting to compute observer-frame quantities. The main goal is to model jet and wind X-ray emission launched during and after neutron star mergers.
+Prompt X-ray emission from neutron star mergers, calculated for structured relativistic outflows at any viewing angle.
 
-The main components of the simulation include:
+## Overview
 
-- **Jet Emission Model**: A simulation of GRB jet structure using Gaussian, power-law, or other profiles to model energy distribution and Lorentz factor.
-- **Wind Model**: A simulation of magnetar-powered wind emission.
-- **Normalization and Integration**: Doppler-boosted emission is normalized for different viewing angles, and the results are integrated to generate light curves and spectra.
-- **Visualization**: The project includes various plotting functions to visualize the energy distribution, emission profiles, and observed light curves.
+PromptX simulates the emission from gamma-ray burst (GRB) jets and magnetar-powered winds using phenomenological models. It supports Gaussian, power-law, and top-hat outflows, calculating spectra and light curves observed from arbitrary angles.
 
 ## Features
 
-- Jet and wind emission modeling with structured energy profiles.
-- Doppler-boosted emission calculation for various viewing angles.
-- Generation of GRB light curves and spectra in X-rays and gamma-rays for on-axis and off-axis observers.
+- Structured jet and wind emission modeling
+- Doppler-boosted observer-frame calculations
+- Light curve and spectrum generation across X-ray and gamma-ray bands
 
-## File Structure
+## System Compatibility
 
-- **`main.py`**: The main script for running simulations, including setting up the jet and wind models, running the observer calculations, and saving results.
-- **`Jet.py`**: Contains the `Jet` class, which models the GRB jet emission, including normalization and Doppler boosting.
-- **`Wind.py`**: Contains the `Wind` class, which models magnetar-powered wind emission.
-- **`helper.py`**: Functions for handling generic calculations and tasks.
-- **`examples.py`**: Example functions for intrductory use.
-
-## Dependencies
-
-- Python 3.x
-- NumPy
-- Matplotlib
-- SciPy
+The code has currently only been tested on macOS. It may work on other operating systems, but has not been extensively tested or officially supported. All documentation assumes a Unix-based system (e.g., macOS or Linux).
 
 ## Installation
 
-1. Clone this repository:
+```bash
+git clone https://github.com/cjules0609/promptx.git
+cd promptx
+pip install -r requirements.txt
+```
 
-   ```bash
-   git clone https://github.com/cjules0609/promptx.git
-   cd promptx
-   ```
-
-
-2. Install the required dependencies:
-   ```bash
-   pip install -e requirements.txt
-   ```
 ## Example Usage
 
-1. To run a selection of default examples contained in examples,py:
+To run default examples:
 
    ```bash
+   cd scripts/
    python examples.py
    ```
 
-3. The output, including plots and data files, will be saved in the ./output/ directory.
+Outputs are saved to ./scripts/out directory.
+
+## Documentation
+Full documentation is available locally by following these steps:
+
+1. Install Sphinx and ReadTheDocs theme:
+   ```bash 
+   pip install sphinx sphinx-rtd-theme
+   ```
+
+2. Build the HTML
+   ```bash
+   sphinx-build -b html docs/source docs/build
+   ```
+
+3. Open the HTML documentation
+   ```bash
+   open docs/build/index.html
+   ```
 
 ## License
-This project is licensed under the MIT License.
+MIT License
 
 ## Acknowledgements
 Chen, Wang, and Zhang (2025) in prep.

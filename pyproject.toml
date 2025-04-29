@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promptx"
+version = "1.0"
+description = "Prompt X-ray counterparts of neutron star mergers for structured relativistic outflows calculated for any observer"
+authors = [
+  {name="Connery Chen", email="connery.chen@unlv.edu"},
+  {name="Yihan Wang", email="yihan.wang@unlv.edu"},
+  {name="Bing Zhang", email="bing.zhang@unlv.edu"}
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "scipy",
+]
+
+[project.optional-dependencies]
+dev = [
+  "sphinx",
+  "pytest",
+]
+
+[tool.setuptools]
+packages = ["promptx"]

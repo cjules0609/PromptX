@@ -11,10 +11,9 @@
 #   License: MIT                                                                #
 # ============================================================================= # 
 
-from helper import *
-from const import *
-from burst import *
-from magnetar import Magnetar
+from .helper import *
+from .const import *
+from .magnetar import Magnetar
 
 class Wind(Magnetar):
     """
@@ -74,7 +73,7 @@ class Wind(Magnetar):
         Parameters:
             theta_los (float): Observer polar angle (line of sight).
             phi_los (float): Observer azimuthal angle.
-            norm (float): Normalization factor for eps scaling.
+            norm (float): Normalization factor (on-axis E_iso of the wind) to scale off-axis E_iso.
         """
 
         # Find grid coordinates corresponding to line of sight (LoS)
@@ -123,10 +122,3 @@ class Wind(Magnetar):
 
         # Total observed luminosity
         self.L_X_tot = self.L_los if theta_los < self.theta_cut else self.L_dopp
-
-        # Band function parameters
-        E_p = 50e3
-        E_min = 0.3e3
-        E_max = 1e6
-        alpha = -1.5
-        beta = -3

@@ -12,8 +12,8 @@
 # ============================================================================= # 
 
 from numpy import int_, newaxis
-from helper import *
-from const import *
+from .helper import *
+from .const import *
 
 class Jet:
     """
@@ -24,8 +24,8 @@ class Jet:
         n_theta (int): Number of theta grid points.
         n_phi (int): Number of phi grid points.
         g0 (float): Initial Lorentz factor on the jet axis.
-        E_iso (float): Isotropic equivalent energy for normalization.
-        eps0 (float): Initial energy per solid angle on the jet axis.
+        E_iso (float): Isotropic equivalent energy for Liang-Ghirlanda relation.
+        eps0 (float): Peak energy per solid angle on the jet axis.
         theta_c (float): Core angle for structured jets.
         theta_cut (float): Jet cutoff angle.
         struct (int): Structure type (0: tophat, 1: gaussian, 2: powerlaw).
@@ -78,8 +78,8 @@ class Jet:
         """
         Normalizes the jet energy profile to match the given isotropic-equivalent energy.
 
-        This method scales the jet's energy profile (per solid angle) such that the total energy 
-        observed in the rest frame corresponds to the specified isotropic energy (E_iso).
+        This method scales the jet's energy profile (per solid angle) such that the observed on-axis 
+        isotropic-equivalent energy equals a given value.
 
         Parameters:
         E_iso (float): The target isotropic-equivalent energy to normalize to.
