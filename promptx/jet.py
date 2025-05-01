@@ -147,8 +147,8 @@ class Jet:
 
         # Adjust spectrum and LC by Doppler ratio
         self.N_E_obs = self.N_E * R_D[..., np.newaxis]**3 * self.dOmega[..., np.newaxis]
-        self.L_gamma_obs = self.L_gamma * R_D[..., np.newaxis]**3 * self.dOmega[..., np.newaxis]
-        self.L_X_obs = self.L_X * R_D[..., np.newaxis]**3 * self.dOmega[..., np.newaxis]
+        self.L_gamma_obs = self.L_gamma * R_D[..., np.newaxis]**4 * self.dOmega[..., np.newaxis]
+        self.L_X_obs = self.L_X * R_D[..., np.newaxis]**4 * self.dOmega[..., np.newaxis]
         
         # Sum the spectra over emitting regions
         self.spec_tot = np.sum(np.where((self.eps[..., np.newaxis] > 0), self.N_E_obs, 0), axis=(0, 1))
@@ -164,13 +164,17 @@ class Jet:
         self.spec_tot /= weight
 
         # Calculate observed energy per solid angle
-        self.eps_bar_gamma = np.sum(np.where((self.eps > 0), int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1e6) * R_D**3 * self.dOmega, 0)) / np.sum(np.where((self.eps > 0), R_D**2 * self.dOmega, 0))
+        self.eps_bar_gamma = int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1000e3)
 
         # Calculate isotropic-equivalent properties
         self.L_gamma_tot *= 4 * np.pi
         self.L_X_tot *= 4 * np.pi
         self.E_iso_obs = 4 * np.pi * self.eps_bar_gamma
+        self.L_iso_obs = 4 * np.pi * int_lc(self.t, self.L_gamma_tot)
         # print('Observed E_iso:', self.E_iso_obs)
+        # print('Observed L_iso:', self.L_iso_obs)
+        # print('L_gamma_peak:', np.max(self.L_gamma_tot))
+        # print('t_peak', self.t[np.argmax(self.L_gamma_tot)])
 
         self.S_prime = self.S_gamma * R_D
         self.S_prime3 = self.S_gamma * R_D**3

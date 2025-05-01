@@ -25,12 +25,7 @@ def gamma2beta(gamma):
 
     Returns:
         float: Velocity factor (beta), between 0 and 1.
-
-    Raises:
-        ValueError: If gamma is less than 1.
     """
-    if gamma < 1:
-        raise ValueError("Gamma must be greater than or equal to 1.")
     return np.sqrt(1 - 1 / gamma**2)
 
 def beta2gamma(beta):
@@ -46,8 +41,6 @@ def beta2gamma(beta):
     Raises:
         ValueError: If beta is not in the range [0, 1).
     """
-    if not (0 <= beta < 1):
-        raise ValueError("Beta must be in the range [0, 1).")
     return 1 / np.sqrt(1 - beta**2)
 
 def gaussian(x, sigma, mu=0):
@@ -471,8 +464,8 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
 
     # LIGHT CURVE
     # FRED function parameters
-    a_1 = 0.05
-    a_2 = 0.15
+    a_1 = 0.1
+    a_2 = 0.35
 
     # Generate FRED light curve
     t = np.geomspace(1e-3, 1e3, 1000)
@@ -481,7 +474,7 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
     # Normalize time-integrated Luminosity
     S_unit = int_lc(t, L)
     A_lc = S / S_unit
-    L_scaled = A_lc[..., np.newaxis] * L 
+    L_scaled = A_lc[..., np.newaxis] * L
 
     return E, N_E_norm, t, L_scaled, S
 
@@ -516,4 +509,6 @@ def e_iso_grid(theta, phi, g, eps, dOmega):
         # Energy observed at this grid point
         E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**3 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**2 * dOmega[eps > 0])
         E_iso_grid[i_theta] = E_iso  # Store the calculated E_iso for each grid point
+
+    print(np.sum(R_D[eps > 0]**3 * dOmega[eps > 0]))
     return E_iso_grid
