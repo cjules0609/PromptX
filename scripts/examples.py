@@ -65,11 +65,12 @@ def plot_lc(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
     ax_lc.legend(loc='upper right', ncol=2)
 
     plt.savefig(path + f'lc_{round(np.rad2deg(theta_los), 3)}.png', dpi=300)
+    plt.show()
     plt.close(fig_lc)
 
-def plot_spec(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
+def plot_spec(jet, theta_los, phi_los, path='./out/', model_id=0):
     """
-    Plot the spectra of the jet and wind components.
+    Plot the spectrum of the jet.
 
     Args:
         (same as plot_lc)
@@ -78,7 +79,7 @@ def plot_spec(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
 
     fig_spec, ax_spec = plt.subplots()
 
-    ax_spec.plot(jet.E, jet.spec_tot * jet.E**2, label=r'$\mathcal{R}_\mathcal{D}$ jet', lw=1, c='r')
+    ax_spec.plot(jet.E, jet.spec_tot * jet.E**2, label=r'Spectrum at $\theta_v={}^\circ$'.format(int(round(np.rad2deg(theta_los)))), lw=1, c='r')
 
     ax_spec.set_xlabel(r'$E$ [eV]')
     ax_spec.set_ylabel(r'$E^2 N(E)$ [erg/s]')
@@ -90,6 +91,7 @@ def plot_spec(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
     ax_spec.legend()
 
     plt.savefig(path + f'spec_{round(np.rad2deg(theta_los), 3)}.png', dpi=300)
+    plt.show()
     plt.close(fig_spec)
 
 def plot_jet_lc_obs(jet, theta_los, phi_los, path='./out/'):
@@ -160,6 +162,7 @@ def plot_jet_lc_obs(jet, theta_los, phi_los, path='./out/'):
     # plt.legend()
     plt.tight_layout()
     plt.savefig(path + '/lc_obs_{}.pdf'.format(np.round(np.rad2deg(theta_los))))
+    plt.show()
     plt.close()
 
 def plot_jet_spec_obs(jet, theta_los, phi_los, path='./out/'):
@@ -213,6 +216,7 @@ def plot_jet_spec_obs(jet, theta_los, phi_los, path='./out/'):
     plt.title(r'$\theta_v={}^\circ$'.format(int(round(np.rad2deg(theta_los)))))
     plt.tight_layout()
     plt.savefig(path + f'/spec_obs_{np.round(np.rad2deg(theta_los))}.pdf')
+    plt.show()
     plt.close()
 
 def plot_E_iso_obs(jet, path='./out/'):
@@ -235,17 +239,18 @@ def plot_E_iso_obs(jet, path='./out/'):
 
     plt.figure()
     plt.plot(theta_v_list, gaussian, 'k--', label='Gaussian profile')
-    plt.plot(theta_v_list, S_obs_list, 'k', label=r'$L_\mathrm{obs}$')
+    plt.plot(theta_v_list, S_obs_list, 'k', label=r'$E_{\rm iso}$')
 
     plt.yscale('log')
     plt.xlim([0, 90])
     plt.ylim([1e40, 1e53])
     plt.xlabel(r'$\theta_\mathrm{v}$ [deg]')
-    plt.ylabel('Luminosity [erg/s]')
-    plt.title('Observed Fluence vs Viewing Angle')
+    plt.ylabel(r'$E_{\rm iso}$ [erg]')
+    plt.title(r'Observed $E_{\rm iso}$ vs Viewing Angle')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(path + '/E_obs.pdf')
+    plt.savefig(path + '/E_iso.pdf')
+    plt.show()
     plt.close()
 
 # -------------------------------------------------------------------
@@ -268,12 +273,21 @@ model_id = 1
 
 # initialize jet and wind
 jet = Jet(g0=200, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, struct=1)
+jet.define_structure(
+    g0=200,
+    eps0=jet.eps[0][0],
+    E_iso=E_iso,
+    struct=1
+)
+jet.create_obs_grid(amati_index=0.4)
+jet.observer(theta_los=theta_los, phi_los=phi_los)
+
 wind = Wind(g0=50, n_theta=n_theta, n_phi=n_phi, theta_cut=theta_cut)
 wind.observer(theta_los=0, phi_los=0)
 
 # run an example!
-plot_lc(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
-plot_spec(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
-plot_jet_lc_obs(jet, theta_los, phi_los, path=path)
-plot_jet_spec_obs(jet, theta_los, phi_los, path=path)
-plot_E_iso_obs(jet, path=path)
+# plot_lc(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
+plot_spec(jet, theta_los, phi_los, path=path, model_id=model_id)
+# plot_jet_lc_obs(jet, theta_los, phi_los, path=path)
+# plot_jet_spec_obs(jet, theta_los, phi_los, path=path)
+# plot_E_iso_obs(jet, path=path)
