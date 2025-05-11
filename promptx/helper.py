@@ -123,7 +123,8 @@ def fred(t, tau_1, tau_2):
     Returns:
         array: FRED light curve evaluated at each time point.
     """
-    return np.array(np.exp(2 * (tau_1 / tau_2) ** 0.5) / np.exp(tau_1 / t + t / tau_2))
+def fred(t, tau_1, tau_2):
+    return np.exp((2 * (tau_1 / tau_2) ** 0.5) - (tau_1 / t + t / tau_2))
 
 def impulse(t, t_peak, width=1e-3):
     """
@@ -441,14 +442,14 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
     # SPECTRUM
     # Reference Band function parameters
     alpha, beta = -1, -2.3
-    E_p_0 = 1e6 
+    E_p = 1e5 * 10**(0.41 * np.log10(e_iso_grid / 1e51) + 0.83)
 
     # Calculate the peak and cutoff energy based on the Amati relation
-    E_p = E_p_0 * (e_iso_grid / e_iso_grid[0])**amati_index
+    # E_p = E_p_0 * (e_iso_grid / e_iso_grid[0])**amati_index
     E_0 = E_p / (2 + alpha)
 
     # Define the energy grid for the spectrum integration
-    E = np.geomspace(1e2, 1e6, 1000)
+    E = np.geomspace(1e2, 1e7, 1000)
 
     # Compute the unnormalized Band spectrum
     N_E = band(E, alpha, beta, E_0)
@@ -510,5 +511,4 @@ def e_iso_grid(theta, phi, g, eps, dOmega):
         E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**3 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**2 * dOmega[eps > 0])
         E_iso_grid[i_theta] = E_iso  # Store the calculated E_iso for each grid point
 
-    print(np.sum(R_D[eps > 0]**3 * dOmega[eps > 0]))
     return E_iso_grid

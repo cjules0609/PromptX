@@ -51,29 +51,34 @@ class Jet:
         self.theta_c = theta_c
         self.theta_cut = theta_cut
 
-        # Depending on the selected jet structure, define the energy per solid angle and Lorentz factor
-        self.eps0 = eps0
-        self.g0 = g0
-        if struct == 0:  # Tophat
-            self.eps = eps_grid(self.eps0, 0, self.theta, struct='pl', cutoff=theta_cut)  # Uniform energy per solid angle profile
-            self.g = gamma_grid(g0, 0, self.theta, struct='pl', cutoff=theta_cut)  # Uniform Lorentz factor profile
+        # Define Lorentz factor and energy per solid angle profiles
+        self.define_structure(g0, eps0, E_iso, struct)
 
-        elif struct == 1:  # Gaussian
-            sigma = theta_c # Gaussian width
-            self.eps = eps_grid(self.eps0, sigma, self.theta, struct='gaussian', cutoff=theta_cut)  # Gaussian energy per solid angle profile
-            E_iso_profile = eps_grid(E_iso, sigma, self.theta, struct='gaussian', cutoff=theta_cut)  # Normalized energy per solid angle profile
-            self.g = lg11(E_iso_profile)  # Lorentz factor profile based on Liang-Ghirlanda 2011
+        # Normalize
+        self.normalize(self.E_iso)
 
-        elif struct == 2:  # Power-law
-            l = 10  # Power-law index
-            self.eps = eps_grid(self.eps0, l, self.theta, struct='pl', cutoff=theta_cut)  # Power-law energy per solid angle profile
-            E_iso_profile = eps_grid(E_iso, l, self.theta, struct='gaussian', cutoff=theta_cut)  # Normalized energy per solid angle profile
-            self.g = lg11(E_iso_profile)  # Lorentz factor profile based on Liang-Ghirlanda 2011
+    def define_structure(self, g0, eps0, E_iso, struct):
+        self.g0 = g0  
+        self.eps0 = eps0  
+        self.E_iso = E_iso  
+        self.struct = struct
 
-        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
-        self.normalize(E_iso)
-        self.create_obs_grid(amati_index=0.4)
-    
+        if self.struct == 0:  # Tophat
+            self.eps = eps_grid(self.eps0, 0, self.theta, struct='pl', cutoff=self.theta_cut)
+            self.g = gamma_grid(self.g0, 0, self.theta, struct='pl', cutoff=self.theta_cut)
+
+        elif self.struct == 1:  # Gaussian
+            sigma = self.theta_c
+            self.eps = eps_grid(self.eps0, sigma, self.theta, struct='gaussian', cutoff=self.theta_cut)
+            E_iso_profile = eps_grid(self.E_iso, sigma, self.theta, struct='gaussian', cutoff=self.theta_cut)
+            self.g = lg11(E_iso_profile)
+
+        elif self.struct == 2:  # Power-law
+            l = 10
+            self.eps = eps_grid(self.eps0, l, self.theta, struct='pl', cutoff=self.theta_cut)
+            E_iso_profile = eps_grid(self.E_iso, l, self.theta, struct='pl', cutoff=self.theta_cut)
+            self.g = lg11(E_iso_profile)
+
     def normalize(self, E_iso):
         """
         Normalizes the jet energy profile to match the given isotropic-equivalent energy.
@@ -84,7 +89,10 @@ class Jet:
         Parameters:
         E_iso (float): The target isotropic-equivalent energy to normalize to.
         """
- 
+
+        # Compute the isotropic equivalent energy per solid angle
+        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
+
         # Compute the normalization factor
         A = E_iso / self.e_iso_grid[0]
 
@@ -94,8 +102,7 @@ class Jet:
         # Recalculate E_iso per grid
         self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
         
-        # Print the normalized value of eps0 for verification
-        print('Normalized eps0:', self.eps[0][0])
+        # print('Normalized eps0:', self.eps[0][0])
 
     def create_obs_grid(self, amati_index=0.5):
         """
@@ -141,7 +148,7 @@ class Jet:
         beta = gamma2beta(self.g)
         t_em = self.t[np.newaxis, np.newaxis, :]  # shape: (1, 1, n_time)   
         R_IS = c * t_em / (1 - beta[..., np.newaxis])
-        dt_geo = R_IS / beta[..., np.newaxis] / c * (1 - beta[..., np.newaxis] * np.cos(theta_obs)[..., np.newaxis])
+        dt_geo = R_IS / (np.maximum(beta[..., np.newaxis], 1e-9)) / c * (1 - np.maximum(beta[..., np.newaxis], 1e-9) * np.cos(theta_obs)[..., np.newaxis])
         dt_geo = np.nan_to_num(dt_geo)
         self.t_obs = (self.t + dt_geo)
 
