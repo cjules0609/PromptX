@@ -30,7 +30,34 @@ class Jet:
         theta_cut (float): Jet cutoff angle.
         struct (int): Structure type (0: tophat, 1: gaussian, 2: powerlaw).
     """
+
     def __init__(self, n_theta=100, n_phi=100, g0=200, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, struct=0):
+        """
+        Initializes the jet model by setting up the grid, defining energy and Lorentz factor profiles,
+        and normalizing the energy distribution.
+
+        Parameters:
+            n_theta (int): Number of polar (theta) grid points (default is 100).
+            n_phi (int): Number of azimuthal (phi) grid points (default is 100).
+            g0 (float): Lorentz factor normalization (default is 200).
+            E_iso (float): Isotropic equivalent energy to normalize the jet to (default is 1e53).
+            eps0 (float): Initial energy per solid angle (default is 1e53).
+            theta_c (float): Core angle for the jet (default is np.pi/2).
+            theta_cut (float): Cutoff angle for the jet structure (default is np.pi/2).
+            struct (int): Structure type for the energy and Lorentz factor profiles (0 for Tophat, 1 for Gaussian, 2 for Power-law).
+            
+        Initializes the following attributes:
+            theta_grid (ndarray): 2D grid of theta values for the jet.
+            phi_grid (ndarray): 2D grid of phi values for the jet.
+            theta (ndarray): 1D array of cell-centered theta values.
+            phi (ndarray): 1D array of cell-centered phi values.
+            dOmega (ndarray): Differential solid angle for each grid cell.
+            theta_c (float): Core angle of the jet.
+            theta_cut (float): Cutoff angle for the wind structure.
+            eps (ndarray): Energy per solid angle profile of the jet.
+            g (ndarray): Lorentz factor profile of the jet.
+        """
+
         # Define the bounds for theta (polar angle) and phi (azimuthal angle)
         theta_bounds = [0, np.pi/2]
         phi_bounds = [0, 2 * np.pi]
@@ -58,6 +85,21 @@ class Jet:
         self.normalize(self.E_iso)
 
     def define_structure(self, g0, eps0, E_iso, struct):
+        """
+        Defines the structure of the wind's energy and Lorentz factor profiles based on the specified profile type.
+
+        Parameters:
+        g0 (float): The initial Lorentz factor normalization.
+        eps0 (float): The initial energy per solid angle (before applying structure).
+        E_iso (float): The isotropic-equivalent energy used for the Gaussian and power-law structures.
+        struct (int): The structure type, where:
+            - 0: Tophat
+            - 1: Gaussian
+            - 2: Power-law
+
+        The function updates the `self.eps` and `self.g` attributes based on the selected structure.
+        """
+
         self.g0 = g0  
         self.eps0 = eps0  
         self.E_iso = E_iso  

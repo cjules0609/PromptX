@@ -31,7 +31,33 @@ class Wind(Magnetar):
         theta_cut (float): Angular cutoff for the wind structure.
         collapse (bool): If True, the magnetar collapses at some time, modifying evolution.
     """
-    def __init__(self, n_theta=100, n_phi=100, g0=50, eps0=1e49, theta_cut=np.pi/2, collapse=False):
+
+    def __init__(self, n_theta=1000, n_phi=100, g0=50, eps0=1e49, theta_cut=np.pi/2, collapse=False):
+        """
+        Initializes a wind model for a magnetar-powered outflow 
+        and defines its coordinate grid, and energy and Lorentz factor structures
+
+        Parameters:
+            n_theta (int): Number of polar (theta) grid points (default is 1000).
+            n_phi (int): Number of azimuthal (phi) grid points (default is 100).
+            g0 (float): Initial Lorentz factor on the wind axis (default is 50).
+            eps0 (float): Initial energy per solid angle (will be overridden by spindown unless code line is commented out).
+            theta_cut (float): Cutoff angle for the wind structure (default is pi/2).
+            collapse (bool): Flag indicating whether the magnetar undergoes collapse (default is False).
+        
+        Initializes the following attributes:
+            engine (Magnetar): Instance of the Magnetar engine used to model the wind.
+            theta_grid (ndarray): 2D grid of theta values for the wind.
+            phi_grid (ndarray): 2D grid of phi values for the wind.
+            theta (ndarray): 1D array of cell-centered theta values.
+            phi (ndarray): 1D array of cell-centered phi values.
+            dOmega (ndarray): Differential solid angle for each grid cell.
+            theta_cut (float): Cutoff angle for the wind structure.
+            eta (float): Conversion efficiency for the magnetar spin-down process.
+            eps (ndarray): Energy per solid angle profile of the wind.
+            g (ndarray): Lorentz factor profile of the wind.
+        """
+
         # Create a magnetar engine instance
         self.engine = Magnetar(collapse=collapse)
 
@@ -56,15 +82,13 @@ class Wind(Magnetar):
 
         # Compute initial energy per solid angle from magnetar spin-down formula
         self.eta = 0.2   # Conversion efficiency
-        self.eps0 = self.eta * (self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega_0**4) / (6 * c**3)
+        eps0 = self.eta * (self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega_0**4) / (6 * c**3) # Comment out if passing user-defined eps0
 
         # Assign isotropic energy profile
-        self.eps = eps_grid(self.eps0, 0, self.theta, struct='pl', cutoff=theta_cut)
+        self.eps = eps_grid(eps0, 0, self.theta, struct='pl', cutoff=theta_cut)
 
         # Assign isotropic Lorentz factor profile 
-        self.g0 = g0
-        self.g = self.g0 * gamma_grid(0, self.theta, struct='pl', cutoff=theta_cut)
-
+        self.g = g0 * gamma_grid(0, self.theta, struct='pl', cutoff=theta_cut)
 
     def observer(self, theta_los=0, phi_los=0, norm=1):
         """
