@@ -55,8 +55,8 @@ class Wind(Magnetar):
         self.theta_cut = theta_cut
 
         # Compute initial energy per solid angle from magnetar spin-down formula
-        eta = 0.2   # Conversion efficiency
-        self.eps0 = eta * (self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega_0**4) / (6 * c**3)
+        self.eta = 0.2   # Conversion efficiency
+        self.eps0 = self.eta * (self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega_0**4) / (6 * c**3)
 
         # Assign isotropic energy profile
         self.eps = eps_grid(self.eps0, 0, self.theta, struct='pl', cutoff=theta_cut)
@@ -93,26 +93,31 @@ class Wind(Magnetar):
         self.eps_prime3 = self.eps * self.r_dopp**3
 
         # Patch with maximum Doppler-boosted energy
-        eps_prime_max_index = np.argmax(np.array(self.eps_prime))
-        self.theta_max, self.phi_max = np.unravel_index(eps_prime_max_index, self.eps_prime.shape)
+        # eps_prime_max_index = np.argmax(np.array(self.eps_prime))
+        # self.theta_max, self.phi_max = np.unravel_index(eps_prime_max_index, self.eps_prime.shape)
 
         # Compute effective line-of-sight energy of emitting regions (weighted average)
         eps_cut = self.eps_prime[self.eps_prime != 0]
         r_dopp_cut = self.r_dopp[self.eps_prime != 0]
         dOmega_cut = self.dOmega[self.eps_prime != 0]
         self.eps_prime_los = (np.sum(eps_cut * dOmega_cut * r_dopp_cut**2) / np.sum(dOmega_cut * r_dopp_cut**2))
-        print('Total eps_eff in los:', self.eps_prime_los)
+        # print('Total eps_eff in los:', self.eps_prime_los)
 
         # Compute base spin-down luminosity
-        eta = 0.1
-        L_sd = (eta * self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega**4) / (6 * c**3)
+        L_sd = (self.eta * self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega**4) / (6 * c**3)
 
         # On-axis wind emission
         self.L_on = np.where(self.engine.t > self.engine.t_coll, 0, L_sd)
 
         # Line-of-sight wind emission
-        self.L_los = np.where(theta_los < self.theta_cut, L_sd, L_sd * np.exp(-10 * self.engine.tau))
-        self.L_los = np.where(self.engine.t > self.engine.t_coll, 0, self.L_los)
+        self.L_los = np.where(
+            self.engine.t > self.engine.t_coll, 
+            0, 
+            np.where(theta_los < self.theta_cut, 
+                    L_sd, 
+                    L_sd * np.exp(-10 * self.engine.tau)
+                )
+        )
 
         # Ratio of Doppler-boosted energy to on-axis energy
         self.r_eps = self.eps_prime_los / norm if self.eps_prime_los > 0 else np.nan
