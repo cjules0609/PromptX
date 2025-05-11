@@ -60,4 +60,4 @@ Full documentation is available locally by following these steps:
 MIT License
 
 ## Acknowledgements
-Chen, Wang, and Zhang (2025) in prep.
+[Chen, Wang, and Zhang (2025)](https://doi.org/10.48550/arXiv.2505.01606).
