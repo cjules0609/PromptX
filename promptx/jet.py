@@ -19,19 +19,8 @@ class Jet:
     """
     Represents a relativistic jet launched by a central engine, characterized
     by its energy and Lorentz factor structure as a function of polar angle.
-
-    Parameters:
-        n_theta (int): Number of theta grid points.
-        n_phi (int): Number of phi grid points.
-        g0 (float): Initial Lorentz factor on the jet axis.
-        E_iso (float): Isotropic equivalent energy for Liang-Ghirlanda relation.
-        eps0 (float): Peak energy per solid angle on the jet axis.
-        theta_c (float): Core angle for structured jets.
-        theta_cut (float): Jet cutoff angle.
-        struct (int): Structure type (0: tophat, 1: gaussian, 2: powerlaw).
     """
-
-    def __init__(self, n_theta=100, n_phi=100, g0=200, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, struct=0):
+    def __init__(self, n_theta=100, n_phi=100, g0=100, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, struct=0):
         """
         Initializes the jet model by setting up the grid, defining energy and Lorentz factor profiles,
         and normalizing the energy distribution.
@@ -44,7 +33,7 @@ class Jet:
             eps0 (float): Initial energy per solid angle (default is 1e53).
             theta_c (float): Core angle for the jet (default is np.pi/2).
             theta_cut (float): Cutoff angle for the jet structure (default is np.pi/2).
-            struct (int): Structure type for the energy and Lorentz factor profiles (0 for Tophat, 1 for Gaussian, 2 for Power-law).
+            struct (str or function): Structure type, either 'gaussian', 'powerlaw', or a custom function.
             
         Initializes the following attributes:
             theta_grid (ndarray): 2D grid of theta values for the jet.
@@ -92,10 +81,11 @@ class Jet:
         g0 (float): The initial Lorentz factor normalization.
         eps0 (float): The initial energy per solid angle (before applying structure).
         E_iso (float): The isotropic-equivalent energy used for the Gaussian and power-law structures.
-        struct (int): The structure type, where:
-            - 0: Tophat
-            - 1: Gaussian
-            - 2: Power-law
+        struct (int or function): The structure type, where:
+            - 1: Tophat
+            - 2: Gaussian
+            - 3: Power-law
+            - function: A custom piecewise function to define eps and gamma.
 
         The function updates the `self.eps` and `self.g` attributes based on the selected structure.
         """
@@ -105,20 +95,21 @@ class Jet:
         self.E_iso = E_iso  
         self.struct = struct
 
-        if self.struct == 0:  # Tophat
-            self.eps = eps_grid(self.eps0, 0, self.theta, struct='pl', cutoff=self.theta_cut)
-            self.g = gamma_grid(self.g0, 0, self.theta, struct='pl', cutoff=self.theta_cut)
-
-        elif self.struct == 1:  # Gaussian
+        if callable(self.struct):  # Check if struct is a function
+            self.eps = eps_grid(self.eps0, self.theta, struct=self.struct)
+            self.g = gamma_grid(self.g0, self.theta, struct=self.struct)
+        elif self.struct == 1 or self.struct == 'tophat':  # Tophat
+            self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw', cutoff=self.theta_cut)
+            self.g = self.g0 * gamma_grid(self.g0, self.theta, k=0, struct='powerlaw', cutoff=self.theta_cut)
+        elif self.struct == 2 or self.struct == 'gaussian':  # Gaussian
             sigma = self.theta_c
-            self.eps = eps_grid(self.eps0, sigma, self.theta, struct='gaussian', cutoff=self.theta_cut)
-            E_iso_profile = eps_grid(self.E_iso, sigma, self.theta, struct='gaussian', cutoff=self.theta_cut)
+            self.eps = eps_grid(self.eps0, self.theta, k=sigma, struct='gaussian', cutoff=self.theta_cut)
+            E_iso_profile = eps_grid(self.E_iso, self.theta, k=sigma, struct='gaussian', cutoff=self.theta_cut)
             self.g = lg11(E_iso_profile)
-
-        elif self.struct == 2:  # Power-law
-            l = 10
-            self.eps = eps_grid(self.eps0, l, self.theta, struct='pl', cutoff=self.theta_cut)
-            E_iso_profile = eps_grid(self.E_iso, l, self.theta, struct='pl', cutoff=self.theta_cut)
+        elif self.struct == 3 or self.struct == 'powerlaw':  # Power-law
+            l = 2
+            self.eps = eps_grid(self.eps0, self.theta, k=l, struct='powerlaw', cutoff=self.theta_cut)
+            E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw', cutoff=self.theta_cut)
             self.g = lg11(E_iso_profile)
 
     def normalize(self, E_iso):

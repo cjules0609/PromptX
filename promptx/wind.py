@@ -19,17 +19,6 @@ class Wind(Magnetar):
     """
     Represents a magnetar-powered relativistic wind, with energy and Lorentz factor
     profiles structured as a function of polar angle.
-
-    Inherits from:
-        Magnetar: Provides magnetar-related properties like magnetic field, spin, etc.
-
-    Parameters:
-        n_theta (int): Number of polar (theta) grid points.
-        n_phi (int): Number of azimuthal (phi) grid points.
-        g0 (float): Lorentz factor normalization.
-        eps0 (float): Initial energy per solid angle (overwritten by magnetar spin-down formula).
-        theta_cut (float): Angular cutoff for the wind structure.
-        collapse (bool): If True, the magnetar collapses at some time, modifying evolution.
     """
 
     def __init__(self, n_theta=1000, n_phi=100, g0=50, eps0=1e49, theta_cut=np.pi/2, collapse=False):
@@ -85,10 +74,10 @@ class Wind(Magnetar):
         eps0 = self.eta * (self.engine.B_p**2 * self.engine.R**6 * self.engine.Omega_0**4) / (6 * c**3) # Comment out if passing user-defined eps0
 
         # Assign isotropic energy profile
-        self.eps = eps_grid(eps0, 0, self.theta, struct='pl', cutoff=theta_cut)
+        self.eps = eps_grid(eps0, self.theta, k=0, struct='powerlaw', cutoff=theta_cut)
 
         # Assign isotropic Lorentz factor profile 
-        self.g = g0 * gamma_grid(0, self.theta, struct='pl', cutoff=theta_cut)
+        self.g = gamma_grid(g0, self.theta, k=0, struct='powerlaw', cutoff=theta_cut)
 
     def observer(self, theta_los=0, phi_los=0, norm=1):
         """
