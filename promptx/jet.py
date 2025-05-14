@@ -97,20 +97,20 @@ class Jet:
 
         if callable(self.struct):  # Check if struct is a function
             self.eps = eps_grid(self.eps0, self.theta, struct=self.struct)
-            self.g = gamma_grid(self.g0, self.theta, struct=self.struct)
+            # self.g = gamma_grid(self.g0, self.theta, struct=self.gamma_struct)
+            E_iso_profile = eps_grid(self.E_iso, self.theta, struct=struct)
         elif self.struct == 1 or self.struct == 'tophat':  # Tophat
             self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw', cutoff=self.theta_cut)
-            self.g = self.g0 * gamma_grid(self.g0, self.theta, k=0, struct='powerlaw', cutoff=self.theta_cut)
         elif self.struct == 2 or self.struct == 'gaussian':  # Gaussian
             sigma = self.theta_c
             self.eps = eps_grid(self.eps0, self.theta, k=sigma, struct='gaussian', cutoff=self.theta_cut)
             E_iso_profile = eps_grid(self.E_iso, self.theta, k=sigma, struct='gaussian', cutoff=self.theta_cut)
-            self.g = lg11(E_iso_profile)
         elif self.struct == 3 or self.struct == 'powerlaw':  # Power-law
             l = 2
             self.eps = eps_grid(self.eps0, self.theta, k=l, struct='powerlaw', cutoff=self.theta_cut)
             E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw', cutoff=self.theta_cut)
-            self.g = lg11(E_iso_profile)
+
+        self.g = lg11(E_iso_profile)
 
     def normalize(self, E_iso):
         """
@@ -137,7 +137,7 @@ class Jet:
         
         # print('Normalized eps0:', self.eps[0][0])
 
-    def create_obs_grid(self, amati_index=0.5):
+    def create_obs_grid(self, amati_a=0.41, amati_b=0.83):
         """
         Generate observer-frame spectral and temporal grids for gamma-ray and X-ray bands.
 
@@ -154,10 +154,10 @@ class Jet:
         """
 
         # Calculate on-grid spectrum and light curve for gamma rays (10e3 - 1000e3 eV)
-        self.E, self.N_E, self.t, self.L_gamma, self.S_gamma = obs_grid(self.eps, self.e_iso_grid, amati_index, e_1=10e3, e_2=1000e3)
+        self.E, self.N_E, self.t, self.L_gamma, self.S_gamma = obs_grid(self.eps, self.e_iso_grid, amati_a=amati_a, amati_b=amati_b, e_1=10e3, e_2=1000e3)
 
         # Calculate on-grid spectrum and light curve for X-rays (0.3e3 - 10e3 eV)
-        _, _, _, self.L_X, self.S_X = obs_grid(self.eps, self.e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3)
+        _, _, _, self.L_X, self.S_X = obs_grid(self.eps, self.e_iso_grid, amati_a=amati_a, amati_b=amati_b, e_1=0.3e3, e_2=10e3)
 
     def observer(self, theta_los=0, phi_los=0):
         """

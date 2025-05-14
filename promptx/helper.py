@@ -55,7 +55,7 @@ def gaussian(x, sigma, mu=0):
     Returns:
         array: Gaussian function evaluated at each point in x.
     """
-    return np.exp(-((x - mu) ** 2 / (sigma ** 2)))
+    return np.exp(-(0.5 * (x - mu)**2 / (sigma**2)))
 
 def powerlaw(x, k):
     """
@@ -422,7 +422,7 @@ def eps_grid(eps0, theta, k=1, struct='gaussian', cutoff=None):
 
     return eps0 * eps
 
-def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
+def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
     """
     Computes the spectrum and light curve observed by an observer on a grid.
 
@@ -449,7 +449,7 @@ def obs_grid(eps, e_iso_grid, amati_index, e_1=0.3e3, e_2=10e3):
     # SPECTRUM
     # Reference Band function parameters
     alpha, beta = -1, -2.3
-    E_p = 1e5 * 10**(0.41 * np.log10(e_iso_grid / 1e51) + 0.83)
+    E_p = 1e5 * 10**(amati_a * np.log10(e_iso_grid / 1e51) + amati_b)
 
     # Calculate the peak and cutoff energy based on the Amati relation
     # E_p = E_p_0 * (e_iso_grid / e_iso_grid[0])**amati_index
