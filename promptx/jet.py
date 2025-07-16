@@ -101,7 +101,7 @@ class Jet:
 
         elif self.struct == 1 or self.struct == 'tophat':  # Tophat
             self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw')
-            E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw')
+            E_iso_profile = eps_grid(self.E_iso, self.theta, k=0, struct='powerlaw')
 
         elif self.struct == 2 or self.struct == 'gaussian':  # Gaussian
             sigma = self.theta_c

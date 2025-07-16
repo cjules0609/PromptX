@@ -272,14 +272,15 @@ theta_los, phi_los = np.deg2rad(0), np.deg2rad(0)
 model_id = 1
 
 # initialize jet and wind
-jet = Jet(g0=200, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, struct=1)
+jet = Jet(g0=200, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, jet_struct=1)
 jet.define_structure(
     g0=200,
     eps0=jet.eps[0][0],
     E_iso=E_iso,
-    struct=1
+    jet_struct=1
 )
-jet.create_obs_grid(amati_index=0.4)
+
+jet.create_obs_grid(amati_a=0.41, amati_b=0.83) # Amati relation model of Minaev and Pozanenko 2020
 jet.observer(theta_los=theta_los, phi_los=phi_los)
 
 wind = Wind(g0=50, n_theta=n_theta, n_phi=n_phi, theta_cut=theta_cut)
