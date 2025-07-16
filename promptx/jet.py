@@ -20,7 +20,7 @@ class Jet:
     Represents a relativistic jet launched by a central engine, characterized
     by its energy and Lorentz factor structure as a function of polar angle.
     """
-    def __init__(self, n_theta=100, n_phi=100, g0=100, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, struct=0):
+    def __init__(self, n_theta=100, n_phi=100, g0=100, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, jet_struct=0):
         """
         Initializes the jet model by setting up the grid, defining energy and Lorentz factor profiles,
         and normalizing the energy distribution.
@@ -33,7 +33,7 @@ class Jet:
             eps0 (float): Initial energy per solid angle (default is 1e53).
             theta_c (float): Core angle for the jet (default is np.pi/2).
             theta_cut (float): Cutoff angle for the jet structure (default is np.pi/2).
-            struct (str or function): Structure type, either 'gaussian', 'powerlaw', or a custom function.
+            jet_struct (str or function): Structure type, either 'gaussian', 'powerlaw', or a custom function.
             
         Initializes the following attributes:
             theta_grid (ndarray): 2D grid of theta values for the jet.
@@ -68,12 +68,12 @@ class Jet:
         self.theta_cut = theta_cut
 
         # Define Lorentz factor and energy per solid angle profiles
-        self.define_structure(g0, eps0, E_iso, struct)
+        self.define_structure(g0, eps0, E_iso, jet_struct)
 
         # Normalize
         self.normalize(self.E_iso)
 
-    def define_structure(self, g0, eps0, E_iso, struct):
+    def define_structure(self, g0, eps0, E_iso, jet_struct):
         """
         Defines the structure of the wind's energy and Lorentz factor profiles based on the specified profile type.
 
@@ -93,23 +93,28 @@ class Jet:
         self.g0 = g0  
         self.eps0 = eps0  
         self.E_iso = E_iso  
-        self.struct = struct
+        self.struct = jet_struct
 
         if callable(self.struct):  # Check if struct is a function
             self.eps = eps_grid(self.eps0, self.theta, struct=self.struct)
-            # self.g = gamma_grid(self.g0, self.theta, struct=self.gamma_struct)
-            E_iso_profile = eps_grid(self.E_iso, self.theta, struct=struct)
+            E_iso_profile = eps_grid(self.E_iso, self.theta, struct=self.struct)
+
         elif self.struct == 1 or self.struct == 'tophat':  # Tophat
-            self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw', cutoff=self.theta_cut)
+            self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw')
+            E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw')
+
         elif self.struct == 2 or self.struct == 'gaussian':  # Gaussian
             sigma = self.theta_c
-            self.eps = eps_grid(self.eps0, self.theta, k=sigma, struct='gaussian', cutoff=self.theta_cut)
-            E_iso_profile = eps_grid(self.E_iso, self.theta, k=sigma, struct='gaussian', cutoff=self.theta_cut)
+            self.eps = eps_grid(self.eps0, self.theta, k=sigma, struct='gaussian')
+            E_iso_profile = eps_grid(self.E_iso, self.theta, k=sigma, struct='gaussian')
+
         elif self.struct == 3 or self.struct == 'powerlaw':  # Power-law
             l = 2
-            self.eps = eps_grid(self.eps0, self.theta, k=l, struct='powerlaw', cutoff=self.theta_cut)
-            E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw', cutoff=self.theta_cut)
+            self.eps = eps_grid(self.eps0, self.theta, k=l, struct='powerlaw')
+            E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw')
 
+        else: 
+            raise ValueError(f"Unsupported jet structure type: {self.struct}. Use 'tophat', 'gaussian', 'powerlaw', or a custom function.")
         self.g = lg11(E_iso_profile)
 
     def normalize(self, E_iso):
