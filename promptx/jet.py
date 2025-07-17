@@ -196,14 +196,14 @@ class Jet:
         self.L_X_obs = self.L_X * R_D[..., np.newaxis]**4 * self.dOmega[..., np.newaxis]
         
         # Sum the spectra over emitting regions
-        self.spec_tot = np.sum(np.where((self.eps[..., np.newaxis] > 0), self.N_E_obs, 0), axis=(0, 1))
+        self.spec_tot = np.sum(np.where(theta_los > self.theta[..., np.newaxis], self.N_E_obs, 0), axis=(0, 1))
 
         # Interpolate the light curves for gamma-ray and X-ray emissions
         self.t, self.L_gamma_tot = interp_lc(self.t_obs, self.L_gamma_obs)
         _, self.L_X_tot = interp_lc(self.t_obs, self.L_X_obs)
 
         # Weight by solid angle
-        weight = np.sum(np.where((self.eps[..., np.newaxis] > 0), R_D[..., np.newaxis]**2 * self.dOmega[..., np.newaxis], 0), axis=(0, 1))
+        weight = np.sum(R_D[..., np.newaxis]**2 * self.dOmega[..., np.newaxis], axis=(0, 1))
         self.L_gamma_tot /= weight
         self.L_X_tot /= weight
         self.spec_tot /= weight
