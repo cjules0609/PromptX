@@ -11,6 +11,7 @@
 #   License: MIT                                                                #
 # ============================================================================= # 
 
+from tkinter import E
 import numpy as np
 import csv
 
@@ -459,16 +460,16 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
     # Define the energy grid for the spectrum integration
     E = np.geomspace(1e2, 1e7, 1000)
 
-    # Compute the unnormalized Band spectrum
-    N_E = band(E, alpha, beta, E_0)
+    # Compute the unnormalized Band energy spectrum, EN(E)
+    EN_E = E * band(E , alpha, beta, E_0)
 
     # Normalize spectrum to eps
-    eps_unit = int_spec(E, N_E, E_min=10e3, E_max=1e6)
+    eps_unit = int_spec(E, EN_E, E_min=10e3, E_max=1e6)
     A_spec = eps / eps_unit
-    N_E_norm = A_spec[..., np.newaxis] * N_E 
+    EN_E_norm = A_spec[..., np.newaxis] * EN_E 
 
     # Integrate spectra of emitting regions over detector energy band
-    S = int_spec(E, N_E_norm, E_min=e_1, E_max=e_2)
+    S = int_spec(E, EN_E_norm, E_min=e_1, E_max=e_2)
     S = np.nan_to_num(S, nan=0.0)
 
     # LIGHT CURVE
@@ -485,7 +486,9 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
     A_lc = S / S_unit
     L_scaled = A_lc[..., np.newaxis] * L
 
-    return E, N_E_norm, t, L_scaled, S
+    # print(int_spec(E, EN_E_norm, E_min=10e3, E_max=1e6), int_lc(t, L_scaled))
+
+    return E, EN_E_norm, t, L_scaled, S
 
 def e_iso_grid(theta, phi, g, eps, dOmega):
     """
@@ -510,13 +513,11 @@ def e_iso_grid(theta, phi, g, eps, dOmega):
 
     # Loop over each theta (phi-independent)
     for i_theta in range(len(theta[0])):
-        theta_los = theta[0, i_theta]
         D_on = doppf(g, 0)  # Doppler factor for on-axis observer
         D_off = doppf(g, angular_d(theta[0, i_theta], theta, phi[0, 0], phi))  # Doppler factor for off-axis observer
         R_D = D_off / D_on  # Ratio of Doppler factors
 
         # Energy observed at this grid point
-        E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**3 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**2 * dOmega[eps > 0])
+        E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**1 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**-2 * dOmega[eps > 0])
         E_iso_grid[i_theta] = E_iso  # Store the calculated E_iso for each grid point
-
     return E_iso_grid
