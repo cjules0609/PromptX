@@ -130,7 +130,6 @@ class Jet:
 
         # Compute the isotropic equivalent energy per solid angle
         self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
-
         # Compute the normalization factor
         A = E_iso / self.e_iso_grid[0]
 
@@ -140,7 +139,8 @@ class Jet:
         # Recalculate E_iso per grid
         self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
         
-        # print('Normalized eps0:', self.eps[0][0])
+        print('Normalized eps0:', self.eps[0][0])
+        print(self.e_iso_grid)
 
     def create_obs_grid(self, amati_a=0.41, amati_b=0.83):
         """
@@ -159,7 +159,7 @@ class Jet:
         """
 
         # Calculate on-grid spectrum and light curve for gamma rays (10e3 - 1000e3 eV)
-        self.E, self.N_E, self.t, self.L_gamma, self.S_gamma = obs_grid(self.eps, self.e_iso_grid, amati_a=amati_a, amati_b=amati_b, e_1=10e3, e_2=1000e3)
+        self.E, self.EN_E, self.t, self.L_gamma, self.S_gamma = obs_grid(self.eps, self.e_iso_grid, amati_a=amati_a, amati_b=amati_b, e_1=10e3, e_2=1000e3)
 
         # Calculate on-grid spectrum and light curve for X-rays (0.3e3 - 10e3 eV)
         _, _, _, self.L_X, self.S_X = obs_grid(self.eps, self.e_iso_grid, amati_a=amati_a, amati_b=amati_b, e_1=0.3e3, e_2=10e3)
@@ -190,20 +190,25 @@ class Jet:
         dt_geo = np.nan_to_num(dt_geo)
         self.t_obs = (self.t + dt_geo)
 
+        EN_E_per_sa_obs = self.EN_E * R_D[..., np.newaxis]**3
+        L_gamma_per_sa_obs = self.L_gamma * R_D[..., np.newaxis]**4
+        L_X_per_sa_obs = self.L_X * R_D[..., np.newaxis]**4
+        dOmega_obs = R_D[..., np.newaxis]**-2 * self.dOmega[..., np.newaxis]
+
         # Adjust spectrum and LC by Doppler ratio
-        self.N_E_obs = self.N_E * R_D[..., np.newaxis]**3 * self.dOmega[..., np.newaxis]
-        self.L_gamma_obs = self.L_gamma * R_D[..., np.newaxis]**4 * self.dOmega[..., np.newaxis]
-        self.L_X_obs = self.L_X * R_D[..., np.newaxis]**4 * self.dOmega[..., np.newaxis]
-        
+        self.EN_E_obs = EN_E_per_sa_obs * dOmega_obs
+        self.L_gamma_obs = L_gamma_per_sa_obs * dOmega_obs
+        self.L_X_obs = L_X_per_sa_obs * dOmega_obs
+
         # Sum the spectra over emitting regions
-        self.spec_tot = np.sum(np.where(theta_los > self.theta[..., np.newaxis], self.N_E_obs, 0), axis=(0, 1))
+        self.spec_tot = 4 * np.pi * np.sum(self.EN_E_obs, axis=(0, 1))
 
         # Interpolate the light curves for gamma-ray and X-ray emissions
         self.t, self.L_gamma_tot = interp_lc(self.t_obs, self.L_gamma_obs)
         _, self.L_X_tot = interp_lc(self.t_obs, self.L_X_obs)
 
         # Weight by solid angle
-        weight = np.sum(R_D[..., np.newaxis]**2 * self.dOmega[..., np.newaxis], axis=(0, 1))
+        weight = np.sum(dOmega_obs, axis=(0, 1))
         self.L_gamma_tot /= weight
         self.L_X_tot /= weight
         self.spec_tot /= weight
@@ -215,7 +220,8 @@ class Jet:
         self.L_gamma_tot *= 4 * np.pi
         self.L_X_tot *= 4 * np.pi
         self.E_iso_obs = 4 * np.pi * self.eps_bar_gamma
-        self.L_iso_obs = 4 * np.pi * int_lc(self.t, self.L_gamma_tot)
+        self.L_iso_obs = int_lc(self.t, self.L_gamma_tot)
+
         # print('Observed E_iso:', self.E_iso_obs)
         # print('Observed L_iso:', self.L_iso_obs)
         # print('L_gamma_peak:', np.max(self.L_gamma_tot))
