@@ -98,24 +98,29 @@ class Jet:
         if callable(self.struct):  # Check if struct is a function
             self.eps = eps_grid(self.eps0, self.theta, struct=self.struct)
             E_iso_profile = eps_grid(self.E_iso, self.theta, struct=self.struct)
+            self.g = gamma_grid(self.g0, self.theta, struct=self.struct)
 
         elif self.struct == 1 or self.struct == 'tophat':  # Tophat
             self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw')
             E_iso_profile = eps_grid(self.E_iso, self.theta, k=0, struct='powerlaw')
+            self.g = gamma_grid(self.g0, self.theta, k=0, struct='powerlaw')
 
         elif self.struct == 2 or self.struct == 'gaussian':  # Gaussian
             sigma = self.theta_c
             self.eps = eps_grid(self.eps0, self.theta, k=sigma, struct='gaussian')
             E_iso_profile = eps_grid(self.E_iso, self.theta, k=sigma, struct='gaussian')
+            self.g = gamma_grid(self.g0, self.theta, k=sigma, struct='gaussian')
 
         elif self.struct == 3 or self.struct == 'powerlaw':  # Power-law
             l = 2
             self.eps = eps_grid(self.eps0, self.theta, k=l, struct='powerlaw')
             E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw')
+            self.g = gamma_grid(self.g0, self.theta, k=l, struct='powerlaw')
 
         else: 
             raise ValueError(f"Unsupported jet structure type: {self.struct}. Use 'tophat', 'gaussian', 'powerlaw', or a custom function.")
-        self.g = lg11(E_iso_profile)
+        # self.g = gamma_grid(self.g0 , self.theta, k=0, struct='powerlaw')
+        self.g = lg11 (E_iso_profile)
 
     def normalize(self, E_iso):
         """
@@ -129,7 +134,7 @@ class Jet:
         """
 
         # Compute the isotropic equivalent energy per solid angle
-        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
+        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.theta_cut, self.dOmega)
         # Compute the normalization factor
         A = E_iso / self.e_iso_grid[0]
 
@@ -137,10 +142,7 @@ class Jet:
         self.eps *= A
         
         # Recalculate E_iso per grid
-        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.dOmega)
-        
-        print('Normalized eps0:', self.eps[0][0])
-        print(self.e_iso_grid)
+        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.theta_cut, self.dOmega)
 
     def create_obs_grid(self, amati_a=0.41, amati_b=0.83):
         """
@@ -172,7 +174,6 @@ class Jet:
             theta_los (float): Line-of-sight polar angle (in radians). Default is 0.
             phi_los (float): Line-of-sight azimuthal angle (in radians). Default is 0.
         """
-
         # Find grid coordinates corresponding to line of sight (LoS)
         los_coord = nearest_coord(self.theta, self.phi, theta_los, phi_los)
 
@@ -182,18 +183,22 @@ class Jet:
         R_D = D_off / D_on
 
         # Adjust time according to geometric time delay
-        theta_obs = angular_d(theta_los, self.theta, phi_los, self.phi)
         beta = gamma2beta(self.g)
-        t_em = self.t[np.newaxis, np.newaxis, :]  # shape: (1, 1, n_time)   
-        R_IS = c * t_em / (1 - beta[..., np.newaxis])
-        dt_geo = R_IS / (np.maximum(beta[..., np.newaxis], 1e-9)) / c * (1 - np.maximum(beta[..., np.newaxis], 1e-9) * np.cos(theta_obs)[..., np.newaxis])
-        dt_geo = np.nan_to_num(dt_geo)
-        self.t_obs = (self.t + dt_geo)
+        theta_obs = angular_d(theta_los, self.theta, phi_los, self.phi)
+
+        # Freely expanding
+        t_lab = self.t[np.newaxis, np.newaxis, :]
+        R_em = c * t_lab * beta[..., np.newaxis] / (1 - beta[..., np.newaxis])
+        self.t_obs = self.t + R_em / c * (1 - np.cos(theta_obs)[..., np.newaxis])
+        
+        # Angular dependent R_em
+        # R_em = beta[..., np.newaxis] * c * self.t
+        # self.t_obs = (self.t + R_em / c * (1 - np.cos(theta_obs))[..., np.newaxis]) / R_D[..., np.newaxis]
 
         EN_E_per_sa_obs = self.EN_E * R_D[..., np.newaxis]**3
         L_gamma_per_sa_obs = self.L_gamma * R_D[..., np.newaxis]**4
         L_X_per_sa_obs = self.L_X * R_D[..., np.newaxis]**4
-        dOmega_obs = R_D[..., np.newaxis]**-2 * self.dOmega[..., np.newaxis]
+        dOmega_obs = R_D[..., np.newaxis]**0 * np.where(self.theta < self.theta_cut, self.dOmega, 0.0)[..., np.newaxis]
 
         # Adjust spectrum and LC by Doppler ratio
         self.EN_E_obs = EN_E_per_sa_obs * dOmega_obs
@@ -222,8 +227,9 @@ class Jet:
         self.E_iso_obs = 4 * np.pi * self.eps_bar_gamma
         self.L_iso_obs = int_lc(self.t, self.L_gamma_tot)
 
-        # print('Observed E_iso:', self.E_iso_obs)
-        # print('Observed L_iso:', self.L_iso_obs)
+        print('Spectrum integral:', int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1000e3))
+        print('Light curve integral (gamma):', int_lc(self.t, self.L_gamma_tot))
+        print('Light curve integral (X):', int_lc(self.t, self.L_X_tot))
         # print('L_gamma_peak:', np.max(self.L_gamma_tot))
         # print('t_peak', self.t[np.argmax(self.L_gamma_tot)])
 

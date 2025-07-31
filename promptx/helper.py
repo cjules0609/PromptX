@@ -113,18 +113,6 @@ def band(E, alpha, beta, E_0):
     return np.where(cond, lowE, highE)
 
 def fred(t, tau_1, tau_2):
-    """
-    Fast-rise-exponential-decay (FRED) model function for light curves.
-
-    Args:
-        t (array): Time values for the light curve.
-        tau_1 (float): Parameter controlling the rise of the light curve.
-        tau_2 (float): Parameter controlling the decay of the light curve.
-
-    Returns:
-        array: FRED light curve evaluated at each time point.
-    """
-def fred(t, tau_1, tau_2):
     return np.exp((2 * (tau_1 / tau_2) ** 0.5) - (tau_1 / t + t / tau_2))
 
 def impulse(t, t_peak, width=1e-3):
@@ -240,7 +228,6 @@ def int_spec(E, N_E, E_min=None, E_max=None):
     else:
         raise ValueError("N_E must be 1D or 3D array.")
 
-    
 def int_lc(t, L):
     """
     Integrate light curve over time.
@@ -312,7 +299,6 @@ def interp_spec(E, N):
 
     return E_common, N_total
 
-
 def save_data(jet, wind, theta_los, phi_los, path='./', model_id=0):
     """
     Save time series data of jet and wind to a CSV file.
@@ -360,7 +346,6 @@ def coord_grid(n_theta, n_phi, theta_bounds, phi_bounds):
     theta, phi = np.meshgrid(theta, np.linspace(phi_bounds[0], phi_bounds[1], n_phi))
     return theta, phi
 
-
 def gamma_grid(g0, theta, k=1, struct='gaussian', cutoff=None):
     """
     Generates grid of Lorentz factors based on given structure type and parameters.
@@ -395,7 +380,6 @@ def gamma_grid(g0, theta, k=1, struct='gaussian', cutoff=None):
     g[g < 1] = 1
 
     return g
-
 
 def eps_grid(eps0, theta, k=1, struct='gaussian'):
     """
@@ -461,7 +445,7 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
     E = np.geomspace(1e2, 1e7, 1000)
 
     # Compute the unnormalized Band energy spectrum, EN(E)
-    EN_E = E * band(E , alpha, beta, E_0)
+    EN_E = E * band(E, alpha, beta, E_0)
 
     # Normalize spectrum to eps
     eps_unit = int_spec(E, EN_E, E_min=10e3, E_max=1e6)
@@ -475,40 +459,22 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
     # LIGHT CURVE
     # FRED function parameters
     a_1 = 0.1
-    a_2 = 0.35
+    a_2 = 0.3
 
     # Generate FRED light curve
-    t = np.geomspace(1e-3, 1e3, 1000)
+    t = np.geomspace(1e-4, 1e2, 1000)
+    t0 = 2
     L = fred(t, a_1, a_2)
+    L = np.where(t < t0, L, 0)
 
     # Normalize time-integrated Luminosity
     S_unit = int_lc(t, L)
     A_lc = S / S_unit
     L_scaled = A_lc[..., np.newaxis] * L
 
-    # print(int_spec(E, EN_E_norm, E_min=10e3, E_max=1e6), int_lc(t, L_scaled))
-
     return E, EN_E_norm, t, L_scaled, S
 
-def e_iso_grid(theta, phi, g, eps, dOmega):
-    """
-    Computes the isotropic equivalent energy (E_iso) for a grid of angles.
-
-    This function calculates the isotropic equivalent energy (E_iso) observed by an observer at increments
-    of theta (assuming azimuthal symmetry). The energy is adjusted for the Doppler shift 
-    and the angular distribution of emission. The Doppler factor is computed for each grid point
-    based on the viewing angle, and the result is scaled according to the solid angle element `dOmega`.
-
-    Args:
-        theta (2D array): Array of polar angle (theta) values defining the grid.
-        phi (2D array): Array of azimuthal angle (phi) values defining the grid.
-        g (float): Lorentz factor, which is used to calculate the Doppler shift.
-        eps (2D array): Energy per solid angle grid values at each point in the grid.
-        dOmega (2D array): Solid angle element at each grid point.
-
-    Returns:
-        2D array: Isotropic equivalent energy (E_iso) at each grid point.
-    """
+def e_iso_grid(theta, phi, g, eps, theta_cut, dOmega):
     E_iso_grid = np.zeros_like(theta[0])
 
     # Loop over each theta (phi-independent)
@@ -518,6 +484,6 @@ def e_iso_grid(theta, phi, g, eps, dOmega):
         R_D = D_off / D_on  # Ratio of Doppler factors
 
         # Energy observed at this grid point
-        E_iso = 4 * np.pi * np.sum(eps[eps > 0] * R_D[eps > 0]**1 * dOmega[eps > 0]) / np.sum(R_D[eps > 0]**-2 * dOmega[eps > 0])
+        E_iso = 4 * np.pi * np.sum(eps[theta < theta_cut] * R_D[theta < theta_cut]**1 * dOmega[theta < theta_cut]) / np.sum(R_D[theta < theta_cut]**-2 * dOmega[theta < theta_cut])
         E_iso_grid[i_theta] = E_iso  # Store the calculated E_iso for each grid point
     return E_iso_grid
