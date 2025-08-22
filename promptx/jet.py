@@ -20,19 +20,19 @@ class Jet:
     Represents a relativistic jet launched by a central engine, characterized
     by its energy and Lorentz factor structure as a function of polar angle.
     """
-    def __init__(self, n_theta=100, n_phi=100, g0=100, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, jet_struct=0):
+    def __init__(self, n_theta=100, n_phi=100, g0=200, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, jet_struct=0):
         """
         Initializes the jet model by setting up the grid, defining energy and Lorentz factor profiles,
         and normalizing the energy distribution.
 
         Parameters:
-            n_theta (int): Number of polar (theta) grid points (default is 100).
-            n_phi (int): Number of azimuthal (phi) grid points (default is 100).
-            g0 (float): Lorentz factor normalization (default is 200).
-            E_iso (float): Isotropic equivalent energy to normalize the jet to (default is 1e53).
-            eps0 (float): Initial energy per solid angle (default is 1e53).
-            theta_c (float): Core angle for the jet (default is np.pi/2).
-            theta_cut (float): Cutoff angle for the jet structure (default is np.pi/2).
+            n_theta (int): Number of polar (theta) grid points.
+            n_phi (int): Number of azimuthal (phi) grid points.
+            g0 (float): Lorentz factor normalization.
+            E_iso (float): On-axis isotropic equivalent energy for normalization.
+            eps0 (float): On-axis energy per solid angle.
+            theta_c (float): Core angle for the jet.
+            theta_cut (float): Cutoff angle for the jet structure.
             jet_struct (str or function): Structure type, either 'gaussian', 'powerlaw', or a custom function.
             
         Initializes the following attributes:
@@ -153,11 +153,14 @@ class Jet:
         - Gamma-rays: 10 keV to 1000 keV
         - X-rays: 0.3 keV to 10 keV
 
-        The Amati relation is used to set the spectral peak energy based on the input `amati_index`.
+        The Amati relation, E_p = 1e5 * 10**(amati_a * np.log10(e_iso_grid / 1e51) + amati_b)
+        is used to set the spectral peak energy based on the input `amati_a` and `amati_b`.
 
         Args:
-            amati_index (float, optional): Slope of the Amati relation to use when determining
-                the rest-frame peak energy. Default is 0.5.
+            amati_a (float, optional): Slope of the Amati relation to use when determining
+                the rest-frame peak energy. 
+            amati_b (float, optional): Intercept of the Amati relation to use when determining
+                the rest-frame peak energy. 
         """
 
         # Calculate on-grid spectrum and light curve for gamma rays (10e3 - 1000e3 eV)
@@ -171,8 +174,8 @@ class Jet:
         Calculates observer-frame properties of the jet at a given line of sight.
 
         Parameters:
-            theta_los (float): Line-of-sight polar angle (in radians). Default is 0.
-            phi_los (float): Line-of-sight azimuthal angle (in radians). Default is 0.
+            theta_los (float): Line-of-sight polar angle (in radians). 
+            phi_los (float): Line-of-sight azimuthal angle (in radians). 
         """
         # Find grid coordinates corresponding to line of sight (LoS)
         los_coord = nearest_coord(self.theta, self.phi, theta_los, phi_los)
@@ -182,28 +185,21 @@ class Jet:
         D_off = doppf(self.g, angular_d(self.theta[los_coord[1], los_coord[0]], self.theta, self.phi[los_coord[1], los_coord[0]], self.phi))
         R_D = D_off / D_on
 
-        # Adjust time according to geometric time delay
+        # EATS
         beta = gamma2beta(self.g)
         theta_obs = angular_d(theta_los, self.theta, phi_los, self.phi)
-
-        # Freely expanding
         t_lab = self.t[np.newaxis, np.newaxis, :]
         R_em = c * t_lab * beta[..., np.newaxis] / (1 - beta[..., np.newaxis])
         self.t_obs = self.t + R_em / c * (1 - np.cos(theta_obs)[..., np.newaxis])
         
-        # Angular dependent R_em
-        # R_em = beta[..., np.newaxis] * c * self.t
-        # self.t_obs = (self.t + R_em / c * (1 - np.cos(theta_obs))[..., np.newaxis]) / R_D[..., np.newaxis]
-
         EN_E_per_sa_obs = self.EN_E * R_D[..., np.newaxis]**3
         L_gamma_per_sa_obs = self.L_gamma * R_D[..., np.newaxis]**4
         L_X_per_sa_obs = self.L_X * R_D[..., np.newaxis]**4
-        dOmega_obs = R_D[..., np.newaxis]**0 * np.where(self.theta < self.theta_cut, self.dOmega, 0.0)[..., np.newaxis]
 
         # Adjust spectrum and LC by Doppler ratio
-        self.EN_E_obs = EN_E_per_sa_obs * dOmega_obs
-        self.L_gamma_obs = L_gamma_per_sa_obs * dOmega_obs
-        self.L_X_obs = L_X_per_sa_obs * dOmega_obs
+        self.EN_E_obs = EN_E_per_sa_obs * self.dOmega[..., np.newaxis]
+        self.L_gamma_obs = L_gamma_per_sa_obs * self.dOmega[..., np.newaxis]
+        self.L_X_obs = L_X_per_sa_obs * self.dOmega[..., np.newaxis]
 
         # Sum the spectra over emitting regions
         self.spec_tot = 4 * np.pi * np.sum(self.EN_E_obs, axis=(0, 1))
@@ -213,7 +209,7 @@ class Jet:
         _, self.L_X_tot = interp_lc(self.t_obs, self.L_X_obs)
 
         # Weight by solid angle
-        weight = np.sum(dOmega_obs, axis=(0, 1))
+        weight = np.sum(self.dOmega[..., np.newaxis], axis=(0, 1))
         self.L_gamma_tot /= weight
         self.L_X_tot /= weight
         self.spec_tot /= weight
@@ -224,7 +220,7 @@ class Jet:
         # Calculate isotropic-equivalent properties
         self.L_gamma_tot *= 4 * np.pi
         self.L_X_tot *= 4 * np.pi
-        self.E_iso_obs = 4 * np.pi * self.eps_bar_gamma
+        self.E_iso_obs = self.eps_bar_gamma
         self.L_iso_obs = int_lc(self.t, self.L_gamma_tot)
 
         print('Spectrum integral:', int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1000e3))
