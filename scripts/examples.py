@@ -23,7 +23,7 @@ from promptx.wind import Wind
 
 plt.rcParams.update({'font.size': 12})
 
-def plot_lc(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
+def plot_lc(jet, wind, path='./out/', model_id=0):
     """
     Plot the light curves of the jet and wind components.
 
@@ -35,7 +35,6 @@ def plot_lc(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
         path (str): Directory path to save the figure.
         model_id (int): Model identifier (controls whether wind is plotted).
     """
-    jet.observer(theta_los=theta_los, phi_los=phi_los)
 
     fig_lc, ax_lc = plt.subplots()
 
@@ -45,8 +44,6 @@ def plot_lc(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
 
     # Plot wind light curves if applicable
     if model_id in [1, 2]:
-        ax_lc.plot(wind.engine.t, wind.L_los, ls='--', lw=1, c='b')
-        ax_lc.plot(wind.engine.t, wind.L_dopp, ls='--', lw=1, c='b')
         ax_lc.plot(wind.engine.t, wind.L_X_tot, lw=1, c='b', label=r'$L_{X,\, \rm wind}$')
 
         if theta_los > wind.theta_cut:
@@ -68,14 +65,13 @@ def plot_lc(jet, wind, theta_los, phi_los, path='./out/', model_id=0):
     plt.show()
     plt.close(fig_lc)
 
-def plot_spec(jet, theta_los, phi_los, path='./out/', model_id=0):
+def plot_spec(jet, path='./out/', model_id=0):
     """
     Plot the spectrum of the jet.
 
     Args:
         (same as plot_lc)
     """
-    jet.observer(theta_los=theta_los, phi_los=phi_los)
 
     fig_spec, ax_spec = plt.subplots()
 
@@ -94,14 +90,13 @@ def plot_spec(jet, theta_los, phi_los, path='./out/', model_id=0):
     plt.show()
     plt.close(fig_spec)
 
-def plot_jet_lc_obs(jet, theta_los, phi_los, path='./out/'):
+def plot_jet_lc_obs(jet, path='./out/'):
     """
     Plot light curves of different emission regions and the total integrated light curve.
 
     Args:
         (same as plot_lc)
     """
-    jet.observer(theta_los=theta_los, phi_los=phi_los)
 
     plt.rcParams.update({'font.size': 12})
     los_coord = [np.abs(jet.theta[0, :] - theta_los).argmin(), np.abs(jet.phi[:, 0] - phi_los).argmin()]
@@ -165,14 +160,13 @@ def plot_jet_lc_obs(jet, theta_los, phi_los, path='./out/'):
     plt.show()
     plt.close()
 
-def plot_jet_spec_obs(jet, theta_los, phi_los, path='./out/'):
+def plot_jet_spec_obs(jet, path='./out/'):
     """
     Plot spectra of different emission regions and the total integrated spectrum.
 
     Args:
         (same as plot_lc)
     """
-    jet.observer(theta_los=theta_los, phi_los=phi_los)
 
     los_coord = [np.abs(jet.theta[0, :] - theta_los).argmin(), np.abs(jet.phi[:, 0] - phi_los).argmin()]
 
@@ -272,12 +266,12 @@ theta_los, phi_los = np.deg2rad(0), np.deg2rad(0)
 model_id = 1
 
 # initialize jet and wind
-jet = Jet(g0=200, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, jet_struct=1)
+jet = Jet(g0=100, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, jet_struct=1)
 jet.define_structure(
-    g0=200,
+    g0=100,
     eps0=jet.eps[0][0],
     E_iso=E_iso,
-    jet_struct=1
+    jet_struct=2
 )
 
 jet.create_obs_grid(amati_a=0.41, amati_b=0.83) # Amati relation model of Minaev and Pozanenko 2020
@@ -287,8 +281,8 @@ wind = Wind(g0=50, n_theta=n_theta, n_phi=n_phi, theta_cut=theta_cut)
 wind.observer(theta_los=0, phi_los=0)
 
 # run an example!
-# plot_lc(jet, wind, theta_los, phi_los, path=path, model_id=model_id)
-plot_spec(jet, theta_los, phi_los, path=path, model_id=model_id)
-# plot_jet_lc_obs(jet, theta_los, phi_los, path=path)
-# plot_jet_spec_obs(jet, theta_los, phi_los, path=path)
+plot_lc(jet, wind, path=path, model_id=model_id)
+# plot_spec(jet, path=path, model_id=model_id)
+plot_jet_lc_obs(jet, path=path)
+# plot_jet_spec_obs(jet, path=path)
 # plot_E_iso_obs(jet, path=path)
