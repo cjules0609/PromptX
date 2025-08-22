@@ -2,6 +2,7 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.6%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+[![DOI](https://zenodo.org/badge/970365196.svg)](https://doi.org/10.5281/zenodo.16923796)
 
 Prompt X-ray emission from neutron star mergers, calculated for structured relativistic outflows at any viewing angle.
 
