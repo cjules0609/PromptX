@@ -20,7 +20,7 @@ class Jet:
     Represents a relativistic jet launched by a central engine, characterized
     by its energy and Lorentz factor structure as a function of polar angle.
     """
-    def __init__(self, n_theta=100, n_phi=100, g0=200, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, theta_cut=np.pi/2, jet_struct=0):
+    def __init__(self, n_theta=100, n_phi=100, g0=200, E_iso=1e53, eps0=1e53, theta_c=np.pi/2, k=0, theta_cut=np.pi/2, jet_struct=0):
         """
         Initializes the jet model by setting up the grid, defining energy and Lorentz factor profiles,
         and normalizing the energy distribution.
@@ -48,24 +48,28 @@ class Jet:
         """
 
         # Define the bounds for theta (polar angle) and phi (azimuthal angle)
-        theta_bounds = [0, np.pi/2]
+        theta_bounds = [0, np.pi]
         phi_bounds = [0, 2 * np.pi]
         
         # Generate a grid for theta and phi, based on the specified grid points
         self.theta_grid, self.phi_grid = coord_grid(n_theta, n_phi, theta_bounds, phi_bounds)
         
         # Compute cell-centered theta and phi values
-        self.theta = (self.theta_grid[:-1, :-1] + self.theta_grid[1:, 1:]) / 2
-        self.phi = (self.phi_grid[:-1, :-1] + self.phi_grid[1:, 1:]) / 2
+        self.theta = 0.25 * (self.theta_grid[:-1, :-1] + self.theta_grid[1:, :-1] +
+                            self.theta_grid[:-1, 1:] + self.theta_grid[1:, 1:])
+        self.phi   = 0.25 * (self.phi_grid[:-1, :-1] + self.phi_grid[1:, :-1] +
+                            self.phi_grid[:-1, 1:] + self.phi_grid[1:, 1:])
 
         # Compute the differential solid angle (dOmega) for each grid cell
-        dtheta = np.gradient(self.theta, axis=1)
-        dphi = np.gradient(self.phi, axis=0)
+        dtheta = np.gradient(self.theta, axis=0)
+        dphi = np.gradient(self.phi, axis=1)
         self.dOmega = np.sin(self.theta) * dtheta * dphi
 
-        # Set the core angle (theta_c) and cutoff angle (theta_cut) for the jet
+        # Set the core and cutoff angle for the jet
         self.theta_c = theta_c
         self.theta_cut = theta_cut
+        # only used for PL profile
+        self.k = k
 
         # Define Lorentz factor and energy per solid angle profiles
         self.define_structure(g0, eps0, E_iso, jet_struct)
@@ -95,32 +99,24 @@ class Jet:
         self.E_iso = E_iso  
         self.struct = jet_struct
 
-        if callable(self.struct):  # Check if struct is a function
-            self.eps = eps_grid(self.eps0, self.theta, struct=self.struct)
-            E_iso_profile = eps_grid(self.E_iso, self.theta, struct=self.struct)
-            self.g = gamma_grid(self.g0, self.theta, struct=self.struct)
+        struct_map = {1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
+        if callable(self.struct):
+            struct = self.struct
+        elif self.struct in struct_map:
+            struct = struct_map[self.struct]
+        elif isinstance(self.struct, str) and self.struct.lower() in struct_map.values():
+            struct = self.struct.lower()
+        else:
+            raise ValueError(f"Invalid structure type: {self.struct}")
 
-        elif self.struct == 1 or self.struct == 'tophat':  # Tophat
-            self.eps = eps_grid(self.eps0, self.theta, k=0, struct='powerlaw')
-            E_iso_profile = eps_grid(self.E_iso, self.theta, k=0, struct='powerlaw')
-            self.g = gamma_grid(self.g0, self.theta, k=0, struct='powerlaw')
+        cutoff = self.theta_cut
 
-        elif self.struct == 2 or self.struct == 'gaussian':  # Gaussian
-            sigma = self.theta_c
-            self.eps = eps_grid(self.eps0, self.theta, k=sigma, struct='gaussian')
-            E_iso_profile = eps_grid(self.E_iso, self.theta, k=sigma, struct='gaussian')
-            self.g = gamma_grid(self.g0, self.theta, k=sigma, struct='gaussian')
+        self.eps = eps_grid(self.eps0, self.theta, self.phi, theta_c=self.theta_c, k=self.k, struct=struct, cutoff=cutoff)
+        E_iso_profile = eps_grid(self.E_iso, self.theta, self.phi, theta_c=self.theta_c, k=self.k, struct=struct, cutoff=cutoff)
+        # self.g = gamma_grid(self.g0, self.theta, k=k, struct=struct, cutoff=cutoff)
 
-        elif self.struct == 3 or self.struct == 'powerlaw':  # Power-law
-            l = 2
-            self.eps = eps_grid(self.eps0, self.theta, k=l, struct='powerlaw')
-            E_iso_profile = eps_grid(self.E_iso, self.theta, k=l, struct='powerlaw')
-            self.g = gamma_grid(self.g0, self.theta, k=l, struct='powerlaw')
-
-        else: 
-            raise ValueError(f"Unsupported jet structure type: {self.struct}. Use 'tophat', 'gaussian', 'powerlaw', or a custom function.")
         # self.g = gamma_grid(self.g0 , self.theta, k=0, struct='powerlaw')
-        self.g = lg11 (E_iso_profile)
+        self.g = lg11(E_iso_profile)
 
     def normalize(self, E_iso):
         """
@@ -134,7 +130,9 @@ class Jet:
         """
 
         # Compute the isotropic equivalent energy per solid angle
-        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.theta_cut, self.dOmega)
+        e_iso_grid_N = e_iso_grid(self.theta, self.phi, 0, self.g, self.eps, self.theta_cut, self.dOmega)
+        e_iso_grid_S = e_iso_grid(self.theta, self.phi, np.pi, self.g, self.eps, self.theta_cut, self.dOmega)
+        self.e_iso_grid = e_iso_grid_N + e_iso_grid_S
         # Compute the normalization factor
         A = E_iso / self.e_iso_grid[0]
 
@@ -142,7 +140,9 @@ class Jet:
         self.eps *= A
         
         # Recalculate E_iso per grid
-        self.e_iso_grid = e_iso_grid(self.theta, self.phi, self.g, self.eps, self.theta_cut, self.dOmega)
+        e_iso_grid_N = e_iso_grid(self.theta, self.phi, 0, self.g, self.eps, self.theta_cut, self.dOmega)
+        e_iso_grid_S = e_iso_grid(self.theta, self.phi, np.pi, self.g, self.eps, self.theta_cut, self.dOmega)
+        self.e_iso_grid = e_iso_grid_N + e_iso_grid_S
 
     def create_obs_grid(self, amati_a=0.41, amati_b=0.83):
         """
@@ -182,8 +182,8 @@ class Jet:
 
         # Compute ratio of Doppler factors
         D_on = doppf(self.g, 0)
-        D_off = doppf(self.g, angular_d(self.theta[los_coord[1], los_coord[0]], self.theta, self.phi[los_coord[1], los_coord[0]], self.phi))
-        R_D = D_off / D_on
+        D_off = doppf(self.g, angular_d(self.theta[los_coord[0], los_coord[1]], self.theta, self.phi[los_coord[0], los_coord[1]], self.phi))
+        self.R_D = D_off / D_on
 
         # EATS
         beta = gamma2beta(self.g)
@@ -192,9 +192,9 @@ class Jet:
         R_em = c * t_lab * beta[..., np.newaxis] / (1 - beta[..., np.newaxis])
         self.t_obs = self.t + R_em / c * (1 - np.cos(theta_obs)[..., np.newaxis])
         
-        EN_E_per_sa_obs = self.EN_E * R_D[..., np.newaxis]**3
-        L_gamma_per_sa_obs = self.L_gamma * R_D[..., np.newaxis]**4
-        L_X_per_sa_obs = self.L_X * R_D[..., np.newaxis]**4
+        EN_E_per_sa_obs = self.EN_E * self.R_D[..., np.newaxis]**3
+        L_gamma_per_sa_obs = self.L_gamma * self.R_D[..., np.newaxis]**4
+        L_X_per_sa_obs = self.L_X * self.R_D[..., np.newaxis]**4
 
         # Adjust spectrum and LC by Doppler ratio
         self.EN_E_obs = EN_E_per_sa_obs * self.dOmega[..., np.newaxis]
@@ -226,8 +226,70 @@ class Jet:
         print('Spectrum integral:', int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1000e3))
         print('Light curve integral (gamma):', int_lc(self.t, self.L_gamma_tot))
         print('Light curve integral (X):', int_lc(self.t, self.L_X_tot))
+        print('E_peak:', self.E[np.argmax(self.E * self.spec_tot)], 'eV')
         # print('L_gamma_peak:', np.max(self.L_gamma_tot))
         # print('t_peak', self.t[np.argmax(self.L_gamma_tot)])
 
-        self.S_prime = self.S_gamma * R_D
-        self.S_prime3 = self.S_gamma * R_D**3
+        self.S_prime = self.S_gamma * self.R_D
+        self.S_prime3 = self.S_gamma * self.R_D**3
+
+    def refine_grid(self, theta_los, phi_los):
+        """
+        Rotate the grid so that the Doppler-brightest spot aligns with the new pole.
+        """
+        # --- Step 1: Compute R_D on cell centers ---
+        los_coord = nearest_coord(self.theta, self.phi, theta_los, phi_los)
+        theta_los_val = self.theta[los_coord[0], los_coord[1]]
+        phi_los_val   = self.phi[los_coord[0], los_coord[1]]
+
+        D_on = doppf(self.g, 0)
+        D_off = doppf(self.g, angular_d(theta_los_val, self.theta, phi_los_val, self.phi))
+        R_D = D_off / D_on
+
+        # --- Step 2: Find max R_D location ---
+        imax, jmax = np.unravel_index(np.argmax(R_D), R_D.shape)
+        theta_peak = self.theta[imax, jmax]
+        phi_peak = self.phi[imax, jmax]
+
+        # --- Step 3: Rotate edges (theta_grid, phi_grid) ---
+        x = np.sin(self.theta_grid) * np.cos(self.phi_grid)
+        y = np.sin(self.theta_grid) * np.sin(self.phi_grid)
+        z = np.cos(self.theta_grid)
+        xyz = np.stack([x, y, z], axis=-1)
+
+        target_vec = np.array([
+            np.sin(theta_peak) * np.cos(phi_peak),
+            np.sin(theta_peak) * np.sin(phi_peak),
+            np.cos(theta_peak)
+        ])
+        north_pole = np.array([0.0, 0.0, 1.0])
+
+        rot_axis = np.cross(north_pole, target_vec)
+        axis_norm = np.linalg.norm(rot_axis)
+        if axis_norm < 1e-12:
+            xyz_rot = xyz
+        else:
+            rot_axis /= axis_norm
+            angle = np.arccos(np.clip(np.dot(north_pole, target_vec), -1.0, 1.0))
+            K = np.array([[0, -rot_axis[2], rot_axis[1]],
+                        [rot_axis[2], 0, -rot_axis[0]],
+                        [-rot_axis[1], rot_axis[0], 0]])
+            R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
+            xyz_rot = xyz @ R.T
+
+        # --- Step 4: Convert back to spherical ---
+        x_rot, y_rot, z_rot = xyz_rot[...,0], xyz_rot[...,1], xyz_rot[...,2]
+        self.theta_grid = np.arccos(np.clip(z_rot, -1.0, 1.0))
+        self.phi_grid = np.arctan2(y_rot, x_rot) % (2*np.pi)
+
+        # --- Step 5: Compute cell-centered theta/phi correctly ---
+        xyz_cells = 0.25 * (xyz_rot[:-1, :-1] + xyz_rot[1:, :-1] +
+                            xyz_rot[:-1, 1:] + xyz_rot[1:, 1:])
+        x_c, y_c, z_c = xyz_cells[...,0], xyz_cells[...,1], xyz_cells[...,2]
+        self.theta = np.arccos(np.clip(z_c, -1.0, 1.0))
+        self.phi = np.arctan2(y_c, x_c) % (2*np.pi)
+
+        # --- Step 6: Compute dOmega from rotated edges ---
+        dtheta = self.theta_grid[1:, :-1] - self.theta_grid[:-1, :-1]
+        dphi   = self.phi_grid[:-1, 1:] - self.phi_grid[:-1, :-1]
+        self.dOmega = np.sin(0.25*(self.theta_grid[:-1, :-1] + self.theta_grid[1:, 1:])) * dtheta * dphi
