@@ -1,5 +1,5 @@
 <svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background circle (lightened gradient) -->
+  <!-- Background gradient -->
   <defs>
     <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#2a2a2a"/>
@@ -8,23 +8,57 @@
   </defs>
   <circle cx="150" cy="150" r="150" fill="url(#bgGrad)" />
 
-  <!-- Central merger: two overlapping blue neutron stars -->
-  <circle cx="120" cy="150" r="20" fill="#4DA6FF"/>
-  <circle cx="180" cy="150" r="20" fill="#3399FF"/>
-
-  <!-- Narrow vertical relativistic jets -->
-  <path d="M150 150 L160 50 L140 50 Z" fill="#FF4C4C" opacity="0.8"/>
-  <path d="M150 150 L160 250 L140 250 Z" fill="#FF4C4C" opacity="0.8"/>
-
-  <!-- Ejecta: grey halo around merger -->
+  <!-- Ejecta halo -->
   <circle cx="150" cy="150" r="60" fill="#AAAAAA" opacity="0.3"/>
 
-  <!-- Wind: subtle blue swirls -->
+  <!-- Neutron stars: elliptical orbit and size change -->
+  <g>
+    <!-- Left neutron star -->
+    <circle cx="120" cy="150" r="20" fill="#4DA6FF">
+      <!-- Horizontal elliptical motion -->
+      <animateTransform attributeName="transform" type="translate"
+                        values="0,0;60,0;0,0;-60,0;0,0"
+                        keyTimes="0;0.25;0.5;0.75;1"
+                        dur="4s" repeatCount="indefinite"/>
+      <!-- Size change for perspective -->
+      <animate attributeName="r" values="20;18;20;22;20" keyTimes="0;0.25;0.5;0.75;1"
+               dur="4s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- Right neutron star -->
+    <circle cx="180" cy="150" r="20" fill="#3399FF">
+      <!-- Horizontal elliptical motion -->
+      <animateTransform attributeName="transform" type="translate"
+                        values="0,0;-60,0;0,0;60,0;0,0"
+                        keyTimes="0;0.25;0.5;0.75;1"
+                        dur="4s" repeatCount="indefinite"/>
+      <!-- Size change for perspective -->
+      <animate attributeName="r" values="20;22;20;18;20" keyTimes="0;0.25;0.5;0.75;1"
+               dur="4s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Jets: grow/shrink vertically only -->
+ <g transform="translate(150,150)">
+  <path d="M0 0 L10 -100 L-10 -100 Z" fill="#FF4C4C" opacity="0.8">
+    <animateTransform attributeName="transform" type="scale"
+                      values="0,0;0,0;2,4;4,4;6,4;8,4;1,0" dur="8s"
+                      repeatCount="indefinite"/>
+  </path>
+  <path d="M0 0 L10 100 L-10 100 Z" fill="#FF4C4C" opacity="0.8">
+    <animateTransform attributeName="transform" type="scale"
+                      values="0,0;0,0;2,4;4,4;6,4;8,4;1,0" dur="8s"
+                      repeatCount="indefinite"/>
+  </path>
+</g>
+
+  <!-- Wind: two diagonal curved lines -->
   <path d="M150 150 C170 130, 200 130, 210 150" stroke="#66CCFF" stroke-width="4" fill="none" opacity="0.6"/>
   <path d="M150 150 C130 170, 100 170, 90 150" stroke="#66CCFF" stroke-width="4" fill="none" opacity="0.6"/>
 
-  <!-- Text: 'PromptX' -->
+  <!-- Text -->
   <text x="150" y="280" font-family="Arial, sans-serif" font-size="36" fill="white" text-anchor="middle" font-weight="bold">
     Prompt<tspan fill="#FF4C4C">X</tspan>
   </text>
 </svg>
+
