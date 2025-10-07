@@ -1,12 +1,23 @@
 # PromptX
 
+<img align="left" src="https://github.com/cjules0609/PromptX/assets/logo.svg" alt="PromptX Logo" width="350"/>
+
 ![Python Version](https://img.shields.io/badge/python-3.6%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 [![DOI](https://zenodo.org/badge/970365196.svg)](https://doi.org/10.5281/zenodo.16923796)
 
-![PromptX Logo](assets/logo.svg)
+<div align="left">
 
-Prompt X-ray emission from neutron star mergers, calculated for structured relativistic outflows at any viewing angle.
+**[Latest Release Notes](CHANGELOG.md#v030---2025-09-06)** | **[Full Changelog](CHANGELOG.md)** | **[Install Now](#installation)**
+</div>
+
+**PromptX** calculates prompt X-ray emission from neutron star mergers for arbitrarily structured relativistic outflows viewed from any viewing angle.
+
+<br clear="left"/>
+
+
+
+
 
 ## Overview
 
