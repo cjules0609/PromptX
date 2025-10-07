@@ -1,6 +1,6 @@
 # PromptX
 
-<img align="left" src="https://github.com/cjules0609/PromptX/main/assets/logo.svg" alt="PromptX Logo" width="350"/>
+<img align="left" src="[https://github.com/cjules0609/PromptX/main/assets/logo.svg](https://raw.githubusercontent.com/cjules0609/promptx/main/assets/logo.svg)" alt="PromptX Logo" width="350"/>
 
 ![Python Version](https://img.shields.io/badge/python-3.6%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
