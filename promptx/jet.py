@@ -218,14 +218,12 @@ class Jet:
         self.eps_bar_gamma = int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1000e3)
 
         # Calculate isotropic-equivalent properties
+        self.E_iso_obs = self.eps_bar_gamma
         self.L_gamma_tot *= 4 * np.pi
         self.L_X_tot *= 4 * np.pi
-        self.E_iso_obs = self.eps_bar_gamma
         self.L_iso_obs = int_lc(self.t, self.L_gamma_tot)
 
-        print('Spectrum integral:', int_spec(self.E, self.spec_tot, E_min=10e3, E_max=1000e3))
-        print('Light curve integral (gamma):', int_lc(self.t, self.L_gamma_tot))
-        print('Light curve integral (X):', int_lc(self.t, self.L_X_tot))
+        print('E_iso,gamma:', self.E_iso_obs)
         print('E_peak:', self.E[np.argmax(self.E * self.spec_tot)], 'eV')
         # print('L_gamma_peak:', np.max(self.L_gamma_tot))
         # print('t_peak', self.t[np.argmax(self.L_gamma_tot)])

@@ -17,6 +17,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.patches import Rectangle
 from matplotlib.colors import LinearSegmentedColormap
+import os
 
 from promptx.jet import Jet
 from promptx.wind import Wind
@@ -75,12 +76,12 @@ def plot_spec(jet, path='./out/', model_id=0):
 
     fig_spec, ax_spec = plt.subplots()
 
-    ax_spec.plot(jet.E, jet.spec_tot * jet.E**2, label=r'Spectrum at $\theta_v={}^\circ$'.format(int(round(np.rad2deg(theta_los)))), lw=1, c='r')
+    ax_spec.plot(jet.E, jet.spec_tot * jet.E, label=r'Spectrum at $\theta_v={}^\circ$'.format(int(round(np.rad2deg(theta_los)))), lw=1, c='r')
 
     ax_spec.set_xlabel(r'$E$ [eV]')
     ax_spec.set_ylabel(r'$E^2 N(E)$ [erg/s]')
-    ax_spec.set_xlim([0.3e3, 1e6])
-    ax_spec.set_ylim([1e42, 1e52])
+    ax_spec.set_xlim([0.3e3, 1e7])
+    ax_spec.set_ylim([1e30, 1e43])
     ax_spec.set_xscale('log')
     ax_spec.set_yscale('log')
     ax_spec.grid()
@@ -117,16 +118,16 @@ def plot_jet_lc_obs(jet, path='./out/'):
 
     fig, axs = plt.subplots(1, 2, figsize=(8, 5))
 
-    for theta_i in range(0, len(jet.theta[0]), 20):
+    for theta_i in range(0, len(jet.theta[0]), 10):
         theta_deg = np.rad2deg(jet.theta[0])[theta_i]
         color = custom_cmap(norm(theta_deg))
-        axs[1].plot(jet.t_obs[0, theta_i], jet.L_X_obs[0, theta_i], color=color, lw=1, ls='--')
-        axs[0].plot(jet.t_obs[0, theta_i], jet.L_gamma_obs[0, theta_i], color=color, lw=1, ls='--')
+        axs[1].plot(jet.t_obs[theta_i, 0], jet.L_X_obs[theta_i, 0], color=color, lw=1, ls='--')
+        axs[0].plot(jet.t_obs[theta_i, 0], jet.L_gamma_obs[theta_i, 0], color=color, lw=1, ls='--')
 
-    axs[0].plot(jet.t_obs[los_coord[1], los_coord[0]], jet.L_gamma_obs[los_coord[1], los_coord[0]], color='k', ls='--', lw=1)
+    axs[0].plot(jet.t_obs[los_coord[0], los_coord[1]], jet.L_gamma_obs[los_coord[0], los_coord[1]], color='k', ls='--', lw=1)
     axs[0].plot(jet.t, jet.L_gamma_tot, color='r', lw=1)
 
-    axs[1].plot(jet.t_obs[los_coord[1], los_coord[0]], jet.L_X_obs[los_coord[1], los_coord[0]], color='k', ls='--', lw=1)
+    axs[1].plot(jet.t_obs[los_coord[0], los_coord[1]], jet.L_X_obs[los_coord[0], los_coord[1]], color='k', ls='--', lw=1)
     axs[1].plot(jet.t, jet.L_X_tot, color='g', lw=1)
 
     for ax in axs:
@@ -183,14 +184,14 @@ def plot_jet_spec_obs(jet, path='./out/'):
     sm = cm.ScalarMappable(cmap=custom_cmap, norm=norm)
 
     fig, ax = plt.subplots()
-    ax.plot(jet.E, jet.E**2 * jet.spec_tot, color='k', lw=2)
+    ax.plot(jet.E, jet.E * jet.spec_tot, color='k', lw=2)
 
     for theta_i in range(0, len(jet.theta[0]), 20):
-        theta_deg = np.rad2deg(jet.theta[0])[theta_i]
+        theta_deg = np.rad2deg(jet.theta[theta_i])[0]
         color = custom_cmap(norm(theta_deg))
-        ax.plot(jet.E, jet.E**2 * jet.N_E_obs[0, theta_i], color=color, lw=1, ls='--')
+        ax.plot(jet.E, jet.E * jet.EN_E_obs[theta_i, 0], color=color, lw=1, ls='--')
 
-    ax.plot(jet.E, jet.E**2 * jet.N_E_obs[los_coord[1], los_coord[0]], color='k', lw=1, ls='--')
+    ax.plot(jet.E, jet.E * jet.EN_E_obs[los_coord[0], los_coord[1]], color='k', lw=1, ls='--')
 
     cbar = fig.colorbar(sm, ax=ax, location='right', pad=0.02)
     cbar.set_label(r'$\theta$ [deg]')
@@ -202,8 +203,8 @@ def plot_jet_spec_obs(jet, path='./out/'):
 
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlim(0.3e3, 1e6)
-    ax.set_ylim(6e34, 2e51)
+    ax.set_xlim([0.3e3, 1e7])
+    ax.set_ylim([1e30, 1e43])
     ax.set_xlabel('E [eV]')
     ax.set_ylabel(r'$E^2 N(E)$ [erg/s]')
     ax.grid()
@@ -220,7 +221,7 @@ def plot_E_iso_obs(jet, path='./out/'):
     Args:
         (same as plot_lc)
     """
-    theta_v_list = np.linspace(0, 90, 31)
+    theta_v_list = np.linspace(0, 30, 31)
     theta_c = np.deg2rad(5)
     E_iso = 1e51
     theta_rad = np.deg2rad(theta_v_list)
@@ -236,7 +237,7 @@ def plot_E_iso_obs(jet, path='./out/'):
     plt.plot(theta_v_list, S_obs_list, 'k', label=r'$E_{\rm iso}$')
 
     plt.yscale('log')
-    plt.xlim([0, 90])
+    plt.xlim([0, 30])
     plt.ylim([1e40, 1e53])
     plt.xlabel(r'$\theta_\mathrm{v}$ [deg]')
     plt.ylabel(r'$E_{\rm iso}$ [erg]')
@@ -253,6 +254,9 @@ def plot_E_iso_obs(jet, path='./out/'):
 
 # define path to save figures
 path = './out/'
+# make directory if it doesn't exist
+os.makedirs(path, exist_ok=True)
+
 # set resolution
 n_theta, n_phi = 500, 100
 # on-axis isotropic-equivalent energy for given jet core width
@@ -266,7 +270,15 @@ theta_los, phi_los = np.deg2rad(0), np.deg2rad(0)
 model_id = 1
 
 # initialize jet and wind
-jet = Jet(g0=100, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_c=theta_c, theta_cut=theta_cut, jet_struct=1)
+jet = Jet(n_theta=n_theta, 
+          n_phi=n_phi, 
+          g0=100, 
+          E_iso=E_iso, 
+          eps0=E_iso, 
+          theta_c=theta_c, 
+          theta_cut=theta_cut, 
+          jet_struct=2
+          )
 jet.define_structure(
     g0=100,
     eps0=jet.eps[0][0],
@@ -281,8 +293,8 @@ wind = Wind(g0=50, n_theta=n_theta, n_phi=n_phi, theta_cut=theta_cut)
 wind.observer(theta_los=0, phi_los=0)
 
 # run an example!
-plot_lc(jet, wind, path=path, model_id=model_id)
+# plot_lc(jet, wind, path=path, model_id=model_id)
 # plot_spec(jet, path=path, model_id=model_id)
-plot_jet_lc_obs(jet, path=path)
+# plot_jet_lc_obs(jet, path=path)
 # plot_jet_spec_obs(jet, path=path)
-# plot_E_iso_obs(jet, path=path)
+plot_E_iso_obs(jet, path=path)
