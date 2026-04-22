@@ -87,7 +87,7 @@ class Magnetar:
         self.t_0_gw = (5 * c**5) / (128 * G * self.I * self.eps**2 * self.Omega_0**4)
 
         # Spin frequency array (logarithmic spacing for resolution)
-        Omega = np.linspace(self.Omega_0, 10, 1000)
+        Omega = np.linspace(self.Omega_0, 1, 1000)
 
         # Invert spin-down equation to get time as a function of Omega
         t = a / (2 * b**2) * np.log((Omega**2 / self.Omega_0**2) * 

@@ -13,8 +13,15 @@
 
 import numpy as np
 import csv
+from scipy.interpolate import griddata
+from scipy.interpolate import interp1d
+from astropy.cosmology import Planck18 as cosmo
+import astropy.units as u
 
 from .const import *
+
+def z2d_L(z):
+    return cosmo.luminosity_distance(z).to('cm').value
 
 def gamma2beta(gamma):
     """
@@ -57,20 +64,20 @@ def gaussian(x, sigma, mu=0):
     """
     return np.exp(-((x - mu)**2 / (2 * sigma**2)))
 
-def powerlaw(x, theta_c, k):
+def powerlaw(x, theta_jet, k):
     """
     Power-law jet profile with a flat core.
 
     Args:
         x (array): Input angles (radians).
-        theta_c (float): Core angle (radians) where profile is flat.
+        theta_jet (float): Core angle (radians) where profile is flat.
         k (float): Power-law exponent.
 
     Returns:
-        array: Normalized profile, equals 1 at theta=0..theta_c,
-               and (theta/theta_c)^(-k) beyond.
+        array: Normalized profile, equals 1 at theta=0..theta_jet,
+               and (theta/theta_jet)^(-k) beyond.
     """
-    return np.where(x <= theta_c, 1.0, (x / theta_c) ** (-k))
+    return np.where(x <= theta_jet, 1.0, (x / theta_jet) ** (-k))
 
 def doppf(g, theta):
     """
@@ -106,7 +113,7 @@ def band(E, alpha, beta, E_0):
         highE = ((alpha - beta) * E_0)**(alpha - beta) * np.exp(beta - alpha) * (E)**beta
     else:
         E_b = E[np.newaxis, np.newaxis, :]
-        E_0_b = E_0[..., np.newaxis, np.newaxis]
+        E_0_b = E_0[..., np.newaxis]
 
         cond = E_b <= (alpha - beta) * E_0_b 
         lowE = (E_b)**alpha * np.exp(-E_b / E_0_b)
@@ -165,17 +172,26 @@ def spherical_to_cartesian(theta, phi):
     y = np.sin(theta) * np.sin(phi)
     return x, y
 
-def lg11(eps):
+def lg11(e_iso, theta=None, theta_cut=None):
     """
     Liang-Ghirlanda (2011) relation for Lorentz Factor.
 
     Args:
-        eps (array): Energy per solid angle values at each theta x phi.
+        e_iso (array): Observed isotropic-equivalent energy at each theta x phi.
 
     Returns:
         array: Lorentz factor.
     """
-    return 200 * (eps / 1e52)**0.25 + 1
+    # Radiative efficiency
+    eta_gamma = 0.01
+    Gamma_0 = 200
+
+    # m = 2.85
+    # q = -0.2
+    # Gamma = 100 * 10**(np.log10(e_iso / 1e52)/m - q) + 1 # Alternative relation from Ghirlanda+18
+
+    Gamma = (Gamma_0 / (1 - eta_gamma)) * (e_iso / 1e52)**0.25 + 1
+    return np.where((theta is not None) & (theta_cut is not None) & (np.abs(np.cos(theta)) < np.cos(theta_cut)), 1.0, Gamma)
 
 def nearest_coord(theta, phi, theta_los, phi_los):
     """
@@ -242,62 +258,39 @@ def int_lc(t, L):
     """
     return np.trapezoid(L, t)
 
-def interp_lc(t, L):
+def interp_lc(t, L, t_common=None):
     """
-    Interpolate light curve over a common time grid.
-
-    Args:
-        t (array): Time values for light curve.
-        L (array): Light curve values.
-
-    Returns:
-        tuple: Interpolated time grid and total interpolated light curve.
+    Interpolate light curves over a common time grid and sum contributions.
     """
-    t_common = np.geomspace(1e-3, 1e6, 1000)
-    L_total = np.zeros_like(t_common)
-
+    if t_common is None:
+        t_common = np.geomspace(1e-3, 1e6, 1000)
+    
+    # Flatten all leading dimensions to (n_curves, n_time)
     t_flat = t.reshape(-1, t.shape[-1])
     L_flat = L.reshape(-1, L.shape[-1])
-
-    for t_ij, L_ij in zip(t_flat, L_flat):
-        if np.all(np.isfinite(t_ij)) and np.any(L_ij > 0):
-            mask = (L_ij > 0) & np.isfinite(t_ij)
-            t_valid = t_ij[mask]
-            L_valid = L_ij[mask]
-            
-            if len(t_valid) > 1:
-                L_interp = np.interp(t_common, t_valid, L_valid, left=0.0, right=0.0)
-                L_total += L_interp
-
+    
+    # Initialize total array
+    L_total = np.zeros_like(t_common)
+    
+    # Vectorized interpolation using list comprehension
+    L_total = np.sum([np.interp(t_common, t_flat[i], L_flat[i], left=0.0, right=0.0)
+                      for i in range(t_flat.shape[0])], axis=0)
+    
     return t_common, L_total
 
-def interp_spec(E, N):
+def interp_spec(E, N, E_common=None):
     """
     Interpolate spectra over a common energy grid and sum contributions.
-
-    Args:
-        E (array): Energy values for spectra (e.g. in keV), shape (..., n_E).
-        N (array): Photon number spectra (e.g. dN/dE), same shape as E.
-
-    Returns:
-        tuple: Interpolated energy grid and total interpolated spectrum.
     """
-    E_common = np.geomspace(1e2, 1e6, 1000)  # adjust as needed for your energy band
-    N_total = np.zeros_like(E_common)
-
+    if E_common is None:
+        E_common = np.geomspace(1e1, 1e7, 1000)
+    
     E_flat = E.reshape(-1, E.shape[-1])
     N_flat = N.reshape(-1, N.shape[-1])
-
-    for E_ij, N_ij in zip(E_flat, N_flat):
-        if np.all(np.isfinite(E_ij)) and np.any(N_ij > 0):
-            mask = (N_ij > 0) & np.isfinite(E_ij)
-            E_valid = E_ij[mask]
-            N_valid = N_ij[mask]
-
-            if len(E_valid) > 1:
-                N_interp = np.interp(E_common, E_valid, N_valid, left=0.0, right=0.0)
-                N_total += N_interp
-
+    
+    N_total = np.sum([np.interp(E_common, E_flat[i], N_flat[i], left=0.0, right=0.0)
+                      for i in range(E_flat.shape[0])], axis=0)
+    
     return E_common, N_total
 
 def save_data(jet, wind, theta_los, phi_los, path='./', model_id=0):
@@ -340,12 +333,19 @@ def coord_grid(n_theta, n_phi, theta_bounds, phi_bounds):
     Returns:
         tuple: theta (columns) and phi (rows) meshgrids.
     """
-    theta = -np.cos(np.linspace(theta_bounds[0], theta_bounds[1], n_theta)) * np.pi / 2 + np.pi / 2
+    # Uniform parameter u in [0,1]
+    u = np.linspace(0, 1, n_theta)
+    alpha = 3
+    
+    # Symmetric tanh mapping
+    theta = 0.5*np.pi * (1 + np.tanh(alpha*(2*u-1)) / np.tanh(alpha))    
 
-    theta, phi = np.meshgrid(theta, np.linspace(phi_bounds[0], phi_bounds[1], n_phi), indexing='ij')
-    return theta, phi
+    phi = np.linspace(phi_bounds[0], phi_bounds[1], n_phi)
+    
+    TH, PH = np.meshgrid(theta, phi, indexing='ij')
+    return TH, PH
 
-def gamma_grid(g0, theta, phi, struct='tophat', theta_c=np.deg2rad(5), cutoff=None, **kwargs):
+def gamma_grid(g0, theta, phi, struct='tophat', theta_jet=np.deg2rad(5), cutoff=None, **kwargs):
     """
     Generates grid of Lorentz factors based on given structure type.
 
@@ -353,82 +353,78 @@ def gamma_grid(g0, theta, phi, struct='tophat', theta_c=np.deg2rad(5), cutoff=No
         g0 (float): Lorentz factor normalization.
         theta (2D array): Meshgrid of polar angles (radians).
         struct (str or callable): 'tophat', 'gaussian', 'powerlaw', or a custom function.
-        theta_c (float, optional): Core angle (radians) for Gaussian or power-law. Defaults to 5 deg.
+        theta_jet (float, optional): Core angle (radians) for Gaussian or power-law. Defaults to 5 deg.
         cutoff (float, optional): Angle beyond which Gamma is set to 1.
         kwargs: Additional parameters like 'k' for power-law exponent.
 
     Returns:
         2D array: Lorentz factor grid.
     """
-    # Custom function
+
+    struct_map = {1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
     if callable(struct):
-        g = g0 * struct(theta, phi)
+        struct = struct
+    elif struct in struct_map:
+        struct = struct_map[struct]
+    elif isinstance(struct, str) and struct.lower() in struct_map.values():
+        struct = struct.lower()
 
-    # Tophat
-    elif struct == 'tophat':
-        g = g0 * np.ones_like(theta)
-        if cutoff:
-            g[abs(np.cos(theta)) < np.cos(cutoff)] = 1
-
-    # Gaussian
-    elif struct == 'gaussian':
-        g = g0 * gaussian(theta, theta_c)
-        if cutoff:
-            g[abs(np.cos(theta)) < np.cos(cutoff)] = 1
-
-    # Power-law
-    elif struct == 'powerlaw':
-        k = kwargs.get('k', 2)  # default exponent
-        g = g0 * powerlaw(theta, theta_c, k)
-        if cutoff:
-            g[abs(np.cos(theta)) < np.cos(cutoff)] = 1
-
-    else:
-        raise ValueError("struct must be 'tophat', 'gaussian', 'powerlaw', or a callable function")
-
-    g[g < 1] = 1
-
-    return g
-
-def eps_grid(eps0, theta, phi, struct='tophat', theta_c=np.deg2rad(5), cutoff=None, **kwargs):
-    """
-    Generates grid of energy per solid angle (eps) with optional counter jet.
-    """
-    # --- main jet centered at theta=0
     if callable(struct):
-        eps_north = eps0 * struct(theta, phi)
+        g = g0 * struct(theta, phi, theta_jet=theta_jet, **kwargs)
     elif struct == 'tophat':
-        eps_north = eps0 * np.ones_like(theta)
+        g = g0 * (theta <= theta_jet).astype(float)
     elif struct == 'gaussian':
-        eps_north = eps0 * gaussian(theta, theta_c)
+        g = g0 * gaussian(theta, theta_jet)
     elif struct == 'powerlaw':
-        k = kwargs.get('k', 0)
-        eps_north = eps0 * powerlaw(theta, theta_c, k)
+        g = 1 + (g0 - 1) / (1 + (theta/theta_jet)**kwargs['k'])
     else:
         raise ValueError("struct must be 'tophat', 'gaussian', 'powerlaw', or a callable")
 
-    # --- counter jet centered at theta=pi (southern hemisphere)
-    theta_mirror = np.pi - theta
-    if callable(struct):
-        eps_south = eps0 * struct(theta_mirror, phi)
-    elif struct == 'tophat':
-        eps_south = eps0 * np.ones_like(theta)
-    elif struct == 'gaussian':
-        eps_south = eps0 * gaussian(theta_mirror, theta_c)
-    elif struct == 'powerlaw':
-        k = kwargs.get('k', 0)
-        eps_south = eps0 * powerlaw(theta_mirror, theta_c, k)
-
-    # --- total = maximum of the two
-    eps = np.maximum(eps_north, eps_south)
-
-    # --- apply cutoff if given
+    g[g < 1] = 1
     if cutoff:
-        eps[abs(np.cos(theta)) < np.cos(cutoff)] = 0
+        g[np.abs(np.cos(theta)) < np.cos(cutoff)] = 1
+
+    return g
+
+def eps_grid(eps0, theta, phi, struct='tophat', theta_jet=np.radians(5), cutoff=np.radians(90), **kwargs):
+    """
+    Generates grid of energy per solid angle (eps) with optional counter jet.
+
+    Parameters:
+        eps0 (float): normalization
+        theta, phi (ndarray): grid of polar and azimuthal angles
+        struct (str or callable): 'tophat', 'gaussian', 'powerlaw', or a callable
+        theta_jet (float): core angle for Gaussian/PL
+        k (float): power-law index if struct='powerlaw'
+        cutoff (float): cutoff angle beyond which eps=0
+        **kwargs: additional args passed to callable struct
+    """
+
+    struct_map = {1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
+    if callable(struct):
+        struct = struct
+    elif struct in struct_map:
+        struct = struct_map[struct]
+    elif isinstance(struct, str) and struct.lower() in struct_map.values():
+        struct = struct.lower()
+
+    if callable(struct):
+        eps = eps0 * struct(theta, phi, theta_jet=theta_jet, **kwargs)
+    elif struct == 'tophat':
+        eps = eps0 * (theta <= theta_jet).astype(float)
+    elif struct == 'gaussian':
+        eps = eps0 * gaussian(theta, theta_jet)
+    elif struct == 'powerlaw':
+        eps = eps0 * powerlaw(theta, theta_jet, kwargs['k'])
+    else:
+        raise ValueError("struct must be 'tophat', 'gaussian', 'powerlaw', or a callable")
+
+    if cutoff:
+        eps[np.abs(np.cos(theta)) < np.cos(cutoff)] = 0
     return eps
 
 
-def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
+def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3, tau_1=0.1, tau_2=0.35):
     """
     Computes the spectrum and light curve observed by an observer on a grid.
 
@@ -469,22 +465,20 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
     EN_E = E * band(E, alpha, beta, E_0)
 
     # Normalize spectrum to eps
-    eps_unit = int_spec(E, EN_E, E_min=10e3, E_max=1e6)
-    A_spec = eps / eps_unit
+    eps_unit = int_spec(E, EN_E, E_min=1e3, E_max=10e6)
+    mask = eps_unit > 0
+    A_spec = np.zeros_like(eps)
+    A_spec[mask] = eps[mask] / eps_unit[mask]
     EN_E_norm = A_spec[..., np.newaxis] * EN_E 
 
     # Integrate spectra of emitting regions over detector energy band
     S = int_spec(E, EN_E_norm, E_min=e_1, E_max=e_2)
     S = np.nan_to_num(S, nan=0.0)
 
-    # LIGHT CURVE
-    # FRED function parameters
-    a_1 = 0.1
-    a_2 = 0.35
-
     # Generate FRED light curve
-    t = np.geomspace(1e-4, 1e2, 1000)
-    L = fred(t, a_1, a_2)
+    t = np.geomspace(1e-3, 1e4, 1000)
+    L = fred(t, tau_1, tau_2)
+    # L = gaussian(t, 0.001, mu = 1e-2)  # Alternative impulse function
 
     # Normalize time-integrated Luminosity
     S_unit = int_lc(t, L)
@@ -493,17 +487,165 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3):
 
     return E, EN_E_norm, t, L_scaled, S
 
-def e_iso_grid(theta, phi, theta_0, g, eps, theta_cut, dOmega):
-    E_iso_grid = np.zeros(theta.shape[0])
-    D_on = doppf(g, 0)  # Doppler factor for on-axis observer 
+def calc_e_iso_grid(theta, phi, g, eps, theta_cut, dOmega):
+    n_theta = theta.shape[0]
+    E_iso_grid = np.zeros(n_theta)
+    D_on = doppf(g, 0)
+    dOmega_sum = np.sum(dOmega)
 
-    # Loop over each theta (phi-independent)
-    for i_theta in range(len(theta)):
-        D_off = doppf(g, theta_0 - angular_d(theta[i_theta, 0], theta, phi[0,0], phi))
-        # D_off = doppf(g, angular_d(theta[i_theta, theta_0], theta, phi[0, 0], phi))  # Doppler factor for off-axis observer
-        R_D = D_off / D_on  # Ratio of Doppler factors
+    th = theta[:, 0]
+    ph = phi[0, :]
 
-        # Energy observed at this grid point
-        E_iso = 4 * np.pi * np.sum(eps[theta < theta_cut] * R_D[theta < theta_cut]**3 * dOmega[theta < theta_cut]) / np.sum(dOmega)
-        E_iso_grid[i_theta] = E_iso  # Store the calculated E_iso for each grid point
+    cos_theta_v = (
+        np.cos(th)[:, None, None] * np.cos(th)[None, :, None] +
+        np.sin(th)[:, None, None] * np.sin(th)[None, :, None] *
+        np.cos(ph)[None, None, :]
+    )
+    theta_v = np.arccos(np.clip(cos_theta_v, -1.0, 1.0))
+
+    mask_jet = theta_v <= theta_cut
+    mask_counter = theta_v >= (np.pi - theta_cut)
+
+    R_D_jet = doppf(g[None, :, :], theta_v) / D_on[None, :, :]
+    R_D_counter = doppf(g[None, :, :], np.pi - theta_v) / D_on[None, :, :]
+
+    eps_b = eps[None, :, :]
+    dOmega_b = dOmega[None, :, :]
+
+    E_iso_jet = 2 * np.pi * np.sum(eps_b * R_D_jet**3 * dOmega_b * mask_jet, axis=(1, 2)) / (dOmega_sum)
+    E_iso_counter = 2 * np.pi * np.sum(eps_b * R_D_counter**3 * dOmega_b * mask_counter, axis=(1, 2)) / (dOmega_sum)
+
+    E_iso_grid = (E_iso_jet + E_iso_counter)
+
+    E_iso_grid = np.minimum(E_iso_grid, E_iso_grid[0])
+    E_iso_grid = np.maximum(E_iso_grid, 1e-30)
+
+    E_iso_grid = np.tile(E_iso_grid[:, np.newaxis], (1, phi.shape[1]))
+
     return E_iso_grid
+
+def profile_interp(orig_theta, orig_phi, orig_profile, theta_rot, phi_rot, method='nearest'):
+    """
+    Interpolate a profile defined on spherical coordinates onto a rotated grid
+    using 3D Cartesian coordinates.
+    """
+    # --- Step 1: Convert original cell centers to Cartesian ---
+    x = np.sin(orig_theta) * np.cos(orig_phi)
+    y = np.sin(orig_theta) * np.sin(orig_phi)
+    z = np.cos(orig_theta)
+    points_xyz = np.column_stack([x.ravel(), y.ravel(), z.ravel()])
+    
+    # --- Step 2: Convert rotated grid to Cartesian ---
+    x_rot = np.sin(theta_rot) * np.cos(phi_rot)
+    y_rot = np.sin(theta_rot) * np.sin(phi_rot)
+    z_rot = np.cos(theta_rot)
+    points_rot_xyz = np.column_stack([x_rot.ravel(), y_rot.ravel(), z_rot.ravel()])
+    
+    # --- Step 3: Interpolate in 3D ---
+    rotated_profile = griddata(points_xyz, orig_profile.ravel(), points_rot_xyz, method=method, fill_value=0.0)
+    
+    return rotated_profile.reshape(theta_rot.shape)
+
+def rotate_spherical(theta, phi, theta_target, phi_target):
+    """
+    Rotate spherical coordinates so that the north pole aligns with (theta_target, phi_target).
+
+    Parameters
+    ----------
+    theta, phi : array_like
+        Input spherical coordinates (can be scalars, 1D arrays, or 2D meshgrids).
+    theta_target, phi_target : float
+        Target spherical coordinates to rotate the north pole onto.
+
+    Returns
+    -------
+    theta_rot, phi_rot : array_like
+        Rotated spherical coordinates (same shape as input).
+    """
+
+    # --- Step 1: Rotation matrix ---
+    target_vec = np.array([
+        np.sin(theta_target) * np.cos(phi_target),
+        np.sin(theta_target) * np.sin(phi_target),
+        np.cos(theta_target)
+    ])
+    north_pole = np.array([0.0, 0.0, 1.0])
+
+    rot_axis = np.cross(north_pole, target_vec)
+    axis_norm = np.linalg.norm(rot_axis)
+    if axis_norm < 1e-12:
+        R = np.eye(3)
+    else:
+        rot_axis /= axis_norm
+        angle = np.arccos(np.clip(np.dot(north_pole, target_vec), -1.0, 1.0))
+        K = np.array([[0, -rot_axis[2], rot_axis[1]],
+                      [rot_axis[2], 0, -rot_axis[0]],
+                      [-rot_axis[1], rot_axis[0], 0]])
+        R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
+
+    # --- Step 2: Cartesian from spherical ---
+    x = np.sin(theta) * np.cos(phi)
+    y = np.sin(theta) * np.sin(phi)
+    z = np.cos(theta)
+    xyz = np.stack([x, y, z], axis=-1)
+
+    # --- Step 3: Rotate ---
+    xyz_rot = xyz @ R.T
+    x_rot, y_rot, z_rot = xyz_rot[..., 0], xyz_rot[..., 1], xyz_rot[..., 2]
+
+    # --- Step 4: Back to spherical ---
+    theta_rot = np.arccos(np.clip(z_rot, -1.0, 1.0))
+    phi_rot = np.arctan2(y_rot, x_rot) % (2*np.pi)
+
+    return theta_rot, phi_rot
+
+def calc_t90(t, L, z=1, windows=[0.064,0.256,1,4,8], F_lim_1s=2.8e-8):
+
+    if len(t) < 2:
+        return np.nan, False, 0.0
+
+    d_L = cosmo.luminosity_distance(z).to(u.cm).value
+
+    flux_t = L / (4 * np.pi * d_L**2)
+
+    dt = np.diff(t)
+    if np.any(dt <= 0):
+        return np.nan, False, 0.0
+
+    trap = (flux_t[:-1] + flux_t[1:]) * 0.5 * dt
+    cum_fluence = np.concatenate([[0], np.cumsum(trap)])
+
+    total_fluence = cum_fluence[-1]
+    if total_fluence <= 0:
+        return np.nan, False, 0.0
+
+    t5  = np.interp(0.05 * total_fluence, cum_fluence, t)
+    t95 = np.interp(0.95 * total_fluence, cum_fluence, t)
+    T90 = t95 - t5
+
+    detected = False
+    F_peak_global = 0
+
+    for dt_trigger in windows:
+
+        F_lim = F_lim_1s * np.sqrt(1.0 / dt_trigger)
+
+        for i in range(len(t)):
+
+            t_end = t[i] + dt_trigger
+            j = np.searchsorted(t, t_end)
+            j = min(j, len(t)-1)
+
+            if j <= i:
+                continue
+
+            flu = cum_fluence[j] - cum_fluence[i]
+            F_avg = flu / dt_trigger
+
+            if F_avg > F_peak_global:
+                F_peak_global = F_avg
+
+            if F_avg >= F_lim:
+                detected = True
+    T90 = np.nan if not detected else T90
+    return T90, detected, F_peak_global

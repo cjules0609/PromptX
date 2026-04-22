@@ -21,7 +21,7 @@ class Wind(Magnetar):
     profiles structured as a function of polar angle.
     """
 
-    def __init__(self, n_theta=1000, n_phi=100, L=1e48, g0=50, L0=1e48, theta_cut=np.pi/2, k=0, collapse=False, wind_struct=1):
+    def __init__(self, n_theta=1000, n_phi=100, L=1e48, g0=50, L0=1e48, theta_jet=np.pi/2, theta_cut=np.pi/2, k=0, collapse=False, wind_struct=1):
         """
         Initializes a wind model for a magnetar-powered outflow 
         and defines its coordinate grid, and energy and Lorentz factor structures
@@ -66,8 +66,7 @@ class Wind(Magnetar):
         dphi = np.gradient(self.phi, axis=1)
         self.dOmega = np.sin(self.theta) * dtheta * dphi
 
-        # Store core angle for wind structure (used in Gaussian/PL profile)
-        self.theta_c = np.radians(20)
+        self.theta_jet = theta_jet
 
         self.k = k  # only used for PL profile
 
@@ -79,7 +78,7 @@ class Wind(Magnetar):
         self.define_structure(g0, L0, wind_struct)
         self.normalize(L0)
 
-    def define_structure(self, g0, L0, wind_struct):
+    def define_structure(self, g0=50, L0=1e48, wind_struct=1):
         """
         Defines the structure of the wind's energy and Lorentz factor profiles based on the specified profile type.
 
@@ -96,8 +95,8 @@ class Wind(Magnetar):
         The function updates the `self.eps` and `self.g` attributes based on the selected structure.
         """
 
-        self.g0 = g0  
-        self.L0 = L0  
+        self.g0 = g0
+        self.L0 = L0
         self.struct = wind_struct
 
         if callable(self.struct):  # Custom function
@@ -105,19 +104,19 @@ class Wind(Magnetar):
             self.g = gamma_grid(self.g0, self.theta, self.phi, struct=self.struct)
 
         elif self.struct in (1, 'tophat'):  # Tophat
-            self.L = eps_grid(self.L0, self.theta, self.phi, struct='tophat', cutoff=self.theta_cut)
-            self.g = gamma_grid(self.g0, self.theta, self.phi, struct='tophat', cutoff=self.theta_cut)
+            self.L = eps_grid(self.L0, self.theta, self.phi, theta_jet=self.theta_jet, struct='tophat')
+            self.g = gamma_grid(self.g0, self.theta, self.phi, theta_jet=self.theta_jet, struct='tophat')
 
         elif self.struct in (2, 'gaussian'):  # Gaussian
-            self.L = eps_grid(self.L0, self.theta, self.phi, theta_c=self.theta_c, struct='gaussian', cutoff=self.theta_cut)
-            self.g = gamma_grid(self.g0, self.theta, self.phi, theta_c=self.theta_c, struct='gaussian', cutoff=self.theta_cut)
+            self.L = eps_grid(self.L0, self.theta, self.phi, theta_jet=self.theta_jet, struct='gaussian')
+            self.g = gamma_grid(self.g0, self.theta, self.phi, theta_jet=self.theta_jet, struct='gaussian')
 
         elif self.struct in (3, 'powerlaw'):  # Power-law
             l = 2
-            self.L = eps_grid(self.L0, self.theta, self.phi, theta_c=self.theta_c, k=l, struct='powerlaw', cutoff=self.theta_cut)
-            self.g = gamma_grid(self.g0, self.theta, self.phi, theta_c=self.theta_c, k=l, struct='powerlaw', cutoff=self.theta_cut)
+            self.L = eps_grid(self.L0, self.theta, self.phi, theta_jet=self.theta_jet, k=l, struct='powerlaw')
+            self.g = gamma_grid(self.g0, self.theta, self.phi, theta_jet=self.theta_jet, k=l, struct='powerlaw')
 
-        else: 
+        else:
             raise ValueError(f"Unsupported jet structure type: {self.struct}. Use 'tophat', 'gaussian', 'powerlaw', or a custom function.")
 
     def normalize(self, L0):
@@ -138,9 +137,6 @@ class Wind(Magnetar):
     
         # Apply the normalization
         self.L *= A
-        
-        print('Normalized L0:', self.L[0][0])
-
 
     def observer(self, theta_los=0, phi_los=0):
         """
@@ -161,22 +157,19 @@ class Wind(Magnetar):
             angular_d(self.theta[los_coord[0], los_coord[1]], self.theta,
                     self.phi[los_coord[0], los_coord[1]], self.phi)
         )
-        self.r_dopp = dopp_off / dopp_on
+        self.R_D = dopp_off / dopp_on
 
         # Doppler-boosted luminosity
-        self.L_prime = self.L * self.r_dopp**2
-        self.L_prime4 = self.L * self.r_dopp**4
-        L_obs_per_sa = self.L * self.r_dopp**4
+        self.L_prime = self.L * self.R_D**2
+        self.L_prime4 = self.L * self.R_D**4
+        L_obs_per_sa = self.L * self.R_D**4
 
         mask_cut = (self.theta < self.theta_cut) | (self.theta > np.pi - self.theta_cut)
-
-        # self.L_prime_los = np.sum(L_cut * dOmega_cut * r_dopp_cut**0)
-        # self.L_prime_los_full = np.sum(self.L_prime * self.dOmega * self.r_dopp**0) 
 
         self.L_prime_los = np.sum(L_obs_per_sa[mask_cut] * self.dOmega[mask_cut])
         self.L_prime_los_full = np.sum(L_obs_per_sa * self.dOmega)
 
-        weight = np.sum(self.dOmega )
+        weight = np.sum(self.dOmega)
 
         self.L_prime_los /= weight
         self.L_prime_los_full /= weight
