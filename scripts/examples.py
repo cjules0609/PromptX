@@ -222,10 +222,10 @@ def plot_E_iso_obs(jet, path='./out/'):
         (same as plot_lc)
     """
     theta_v_list = np.linspace(0, 30, 31)
-    theta_c = np.deg2rad(5)
+    theta_jet = np.deg2rad(5)
     E_iso = 1e51
     theta_rad = np.deg2rad(theta_v_list)
-    gaussian = E_iso * np.exp(-theta_rad**2 / (2 * theta_c**2))
+    gaussian = E_iso * np.exp(-theta_rad**2 / (2 * theta_jet**2))
 
     S_obs_list = []
     for theta_v in theta_v_list:
@@ -261,7 +261,7 @@ os.makedirs(path, exist_ok=True)
 n_theta, n_phi = 500, 100
 # on-axis isotropic-equivalent energy for given jet core width
 E_iso = 1e51
-theta_c = np.deg2rad(5)
+theta_jet = np.deg2rad(5)
 # cutoff angle
 theta_cut = np.deg2rad(35)
 # normalize to on-axis observer
@@ -270,15 +270,7 @@ theta_los, phi_los = np.deg2rad(0), np.deg2rad(0)
 model_id = 1
 
 # initialize jet and wind
-jet = Jet(n_theta=n_theta, 
-          n_phi=n_phi, 
-          g0=100, 
-          E_iso=E_iso, 
-          eps0=E_iso, 
-          theta_c=theta_c, 
-          theta_cut=theta_cut, 
-          jet_struct=2
-          )
+jet = Jet(g0=100, E_iso=E_iso, eps0=E_iso, n_theta=n_theta, n_phi=n_phi, theta_jet=theta_jet, theta_cut=theta_cut, jet_struct=1)
 jet.define_structure(
     g0=100,
     eps0=jet.eps[0][0],

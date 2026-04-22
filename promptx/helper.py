@@ -186,10 +186,6 @@ def lg11(e_iso, theta=None, theta_cut=None):
     eta_gamma = 0.01
     Gamma_0 = 200
 
-    # m = 2.85
-    # q = -0.2
-    # Gamma = 100 * 10**(np.log10(e_iso / 1e52)/m - q) + 1 # Alternative relation from Ghirlanda+18
-
     Gamma = (Gamma_0 / (1 - eta_gamma)) * (e_iso / 1e52)**0.25 + 1
     return np.where((theta is not None) & (theta_cut is not None) & (np.abs(np.cos(theta)) < np.cos(theta_cut)), 1.0, Gamma)
 
@@ -260,7 +256,14 @@ def int_lc(t, L):
 
 def interp_lc(t, L, t_common=None):
     """
-    Interpolate light curves over a common time grid and sum contributions.
+    Interpolate light curve over a common time grid.
+
+    Args:
+        t (array): Time values for light curve.
+        L (array): Light curve values.
+
+    Returns:
+        tuple: Interpolated time grid and total interpolated light curve.
     """
     if t_common is None:
         t_common = np.geomspace(1e-3, 1e6, 1000)
@@ -281,10 +284,17 @@ def interp_lc(t, L, t_common=None):
 def interp_spec(E, N, E_common=None):
     """
     Interpolate spectra over a common energy grid and sum contributions.
+
+    Args:
+        E (array): Energy values for spectra (e.g. in keV), shape (..., n_E).
+        N (array): Photon number spectra (e.g. dN/dE), same shape as E.
+
+    Returns:
+        tuple: Interpolated energy grid and total interpolated spectrum.
     """
-    if E_common is None:
-        E_common = np.geomspace(1e1, 1e7, 1000)
-    
+    E_common = np.geomspace(1e2, 1e6, 1000)  # adjust as needed for your energy band
+    N_total = np.zeros_like(E_common)
+
     E_flat = E.reshape(-1, E.shape[-1])
     N_flat = N.reshape(-1, N.shape[-1])
     
@@ -478,7 +488,6 @@ def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3, t
     # Generate FRED light curve
     t = np.geomspace(1e-3, 1e4, 1000)
     L = fred(t, tau_1, tau_2)
-    # L = gaussian(t, 0.001, mu = 1e-2)  # Alternative impulse function
 
     # Normalize time-integrated Luminosity
     S_unit = int_lc(t, L)
