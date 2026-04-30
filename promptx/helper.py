@@ -6,7 +6,7 @@
 #                                                                               #
 # ============================================================================= #
 #   PromptX - Prompt X-ray emission modeling of relativistic outflows           #
-#   Version 1.0                                                                 #
+#   Version 0.2                                                                 #
 #   Author: Connery Chen, Yihan Wang, and Bing Zhang                            #
 #   License: MIT                                                                #
 # ============================================================================= # 
@@ -24,88 +24,27 @@ def z2d_L(z):
     return cosmo.luminosity_distance(z).to('cm').value
 
 def gamma2beta(gamma):
-    """
-    Convert Lorentz factor to velocity factor.
-
-    Args:
-        gamma (float): Lorentz factor, must be greater than or equal to 1.
-
-    Returns:
-        float: Velocity factor (beta), between 0 and 1.
-    """
+    """Convert Lorentz factor to dimensionless velocity."""
     return np.sqrt(1 - 1 / gamma**2)
 
 def beta2gamma(beta):
-    """
-    Convert velocity factor to Lorentz factor.
-
-    Args:
-        beta (float): Velocity factor, must be between 0 and 1.
-
-    Returns:
-        float: Lorentz factor (gamma), greater than or equal to 1.
-
-    Raises:
-        ValueError: If beta is not in the range [0, 1).
-    """
+    """Convert dimensionless velocity to Lorentz factor."""
     return 1 / np.sqrt(1 - beta**2)
 
 def gaussian(x, sigma, mu=0):
-    """
-    Gaussian function.
-
-    Args:
-        x (array): Input values for Gaussian function.
-        sigma (float): Standard deviation of Gaussian distribution.
-        mu (float): Mean of Gaussian distribution, default is 0.
-
-    Returns:
-        array: Gaussian function evaluated at each point in x.
-    """
+    """Evaluate a Gaussian profile."""
     return np.exp(-((x - mu)**2 / (2 * sigma**2)))
 
 def powerlaw(x, theta_jet, k):
-    """
-    Power-law jet profile with a flat core.
-
-    Args:
-        x (array): Input angles (radians).
-        theta_jet (float): Core angle (radians) where profile is flat.
-        k (float): Power-law exponent.
-
-    Returns:
-        array: Normalized profile, equals 1 at theta=0..theta_jet,
-               and (theta/theta_jet)^(-k) beyond.
-    """
+    """Return a flat-core power-law angular profile."""
     return np.where(x <= theta_jet, 1.0, (x / theta_jet) ** (-k))
 
 def doppf(g, theta):
-    """
-    Doppler factor for relativistic jets.
-
-    Args:
-        g (array): 2D array of Lorentz factor values at each theta x phi.
-        theta (float): Angular distance to each theta x phi.
-
-    Returns:
-        array: 2D array of Doppler factors at each theta x phi.
-    """
-    # Calculate the Doppler factor based on the Lorentz factor (gamma) and angle (theta)
+    """Compute the relativistic Doppler factor."""
     return 1 / (g * (1 - np.sqrt(1 - 1 / g / g) * np.cos(theta)))
 
 def band(E, alpha, beta, E_0):
-    """
-    Band function spectrum.
-
-    Args:
-        E (array): Energy values to compute the spectrum.
-        alpha (float): Spectral index for low energies.
-        beta (float): Spectral index for high energies.
-        E_0 (float or 2D array): Cutoff energy - single or at each theta x phi.
-
-    Returns:
-        1D or 3D array: The Band function spectrum - single or at each theta x phi.
-    """
+    """Evaluate the Band spectrum on a scalar or grid-valued cutoff energy."""
     E = np.asarray(E)
     if np.isscalar(E_0) or E_0.ndim == 0:
         cond = E <= (alpha - beta) * E_0
@@ -124,31 +63,11 @@ def fred(t, tau_1, tau_2):
     return np.exp((2 * (tau_1 / tau_2) ** 0.5) - (tau_1 / t + t / tau_2))
 
 def impulse(t, t_peak, width=1e-3):
-    """
-    Models an impulse function centered at `t_peak` with a given width.
-    
-    Parameters:
-        t (array): Time grid.
-        t_peak (float): Time at which the impulse occurs.
-        width (float): Width of the Gaussian impulse (small value for sharpness).
-    
-    Returns:
-        array: The impulse-like function at each time step.
-    """
-    # Narrow Gaussian to simulate an impulse (width determines sharpness)
+    """Return a narrow Gaussian pulse centered at ``t_peak``."""
     return np.exp(-0.5 * ((t - t_peak) / width) ** 2)
 
 def angular_d(theta_1, theta_2, phi_1, phi_2):
-    """
-    Angular distance between two points on a full sphere.
-
-    Args:
-        theta_1, theta_2 (float): Polar angles [0, π] in radians.
-        phi_1, phi_2 (float): Azimuthal angles [0, 2π] in radians.
-
-    Returns:
-        float: Angular distance in radians between the two points.
-    """
+    """Return the spherical angular separation between two directions."""
     return np.arccos(
         np.clip(
             np.sin(theta_1) * np.sin(theta_2) * np.cos(phi_1 - phi_2) +
@@ -158,31 +77,13 @@ def angular_d(theta_1, theta_2, phi_1, phi_2):
     )
 
 def spherical_to_cartesian(theta, phi):
-    """
-    Convert spherical coordinates (theta, phi) to Cartesian coordinates (x, y).
-
-    Args:
-        theta (array): Polar angle (in radians).
-        phi (array): Azimuthal angle (in radians).
-
-    Returns:
-        tuple: Cartesian coordinates (x, y) corresponding to the spherical coordinates.
-    """
+    """Project spherical coordinates onto Cartesian ``x`` and ``y`` axes."""
     x = np.sin(theta) * np.cos(phi)
     y = np.sin(theta) * np.sin(phi)
     return x, y
 
 def lg11(e_iso, theta=None, theta_cut=None):
-    """
-    Liang-Ghirlanda (2011) relation for Lorentz Factor.
-
-    Args:
-        e_iso (array): Observed isotropic-equivalent energy at each theta x phi.
-
-    Returns:
-        array: Lorentz factor.
-    """
-    # Radiative efficiency
+    """Map isotropic-equivalent energy to Lorentz factor using LG11."""
     eta_gamma = 0.01
     Gamma_0 = 200
 
@@ -190,35 +91,13 @@ def lg11(e_iso, theta=None, theta_cut=None):
     return np.where((theta is not None) & (theta_cut is not None) & (np.abs(np.cos(theta)) < np.cos(theta_cut)), 1.0, Gamma)
 
 def nearest_coord(theta, phi, theta_los, phi_los):
-    """
-    Find the nearest grid coordinates (theta, phi) to a given line-of-sight (theta_los, phi_los).
-
-    Args:
-        theta (array): Array of theta grid values.
-        phi (array): Array of phi grid values.
-        theta_los (float): Line-of-sight polar angle.
-        phi_los (float): Line-of-sight azimuthal angle.
-
-    Returns:
-        tuple: Indices (theta_i, phi_i) corresponding to the nearest grid point.
-    """
+    """Return the grid indices nearest to a line of sight."""
     theta_i = np.abs(theta[:, 0] - theta_los).argmin()
     phi_i = np.abs(phi[0, :] - phi_los).argmin()
     return theta_i, phi_i
 
 def int_spec(E, N_E, E_min=None, E_max=None):
-    """
-    Integrate spectrum over energy range defined by E_min and E_max.
-
-    Args:
-        E (array): Energy values for spectrum.
-        N_E (array): Band spectrum values.
-        E_min (float, optional): Minimum energy for integration.
-        E_max (float, optional): Maximum energy for integration.
-
-    Returns:
-        float: Integral of spectrum over specified energy range.
-    """
+    """Integrate an energy-weighted spectrum over an optional bandpass."""
     E = np.asarray(E)
     N_E = np.asarray(N_E)
 
@@ -242,56 +121,24 @@ def int_spec(E, N_E, E_min=None, E_max=None):
         raise ValueError("N_E must be 1D or 3D array.")
 
 def int_lc(t, L):
-    """
-    Integrate light curve over time.
-
-    Args:
-        t (array): Time values for light curve.
-        L (array): Light curve values.
-
-    Returns:
-        float: The integral of light curve over time.
-    """
+    """Integrate a light curve over time."""
     return np.trapezoid(L, t)
 
 def interp_lc(t, L, t_common=None):
-    """
-    Interpolate light curve over a common time grid.
-
-    Args:
-        t (array): Time values for light curve.
-        L (array): Light curve values.
-
-    Returns:
-        tuple: Interpolated time grid and total interpolated light curve.
-    """
+    """Interpolate and sum light curves onto a common time grid."""
     if t_common is None:
-        t_common = np.geomspace(1e-3, 1e6, 1000)
+        t_common = np.geomspace(1e-3, 1e10, 1000)
     
-    # Flatten all leading dimensions to (n_curves, n_time)
     t_flat = t.reshape(-1, t.shape[-1])
     L_flat = L.reshape(-1, L.shape[-1])
-    
-    # Initialize total array
     L_total = np.zeros_like(t_common)
-    
-    # Vectorized interpolation using list comprehension
     L_total = np.sum([np.interp(t_common, t_flat[i], L_flat[i], left=0.0, right=0.0)
                       for i in range(t_flat.shape[0])], axis=0)
     
     return t_common, L_total
 
 def interp_spec(E, N, E_common=None):
-    """
-    Interpolate spectra over a common energy grid and sum contributions.
-
-    Args:
-        E (array): Energy values for spectra (e.g. in keV), shape (..., n_E).
-        N (array): Photon number spectra (e.g. dN/dE), same shape as E.
-
-    Returns:
-        tuple: Interpolated energy grid and total interpolated spectrum.
-    """
+    """Interpolate and sum spectra onto a common energy grid."""
     E_common = np.geomspace(1e2, 1e6, 1000)  # adjust as needed for your energy band
     N_total = np.zeros_like(E_common)
 
@@ -304,20 +151,7 @@ def interp_spec(E, N, E_common=None):
     return E_common, N_total
 
 def save_data(jet, wind, theta_los, phi_los, path='./', model_id=0):
-    """
-    Save time series data of jet and wind to a CSV file.
-
-    Args:
-        jet (object): Jet object.
-        wind (object): Wind object.
-        theta_los (float): Line-of-sight polar angle in radians.
-        phi_los (float): Line-of-sight azimuthal angle in radians.
-        path (str): Directory path to save the CSV file.
-        model_id (int): Determines how to handle data (1-4).
-
-    Returns:
-        None
-    """
+    """Write jet and optional wind light-curve data to a CSV file."""
     with open(path + '{}_data.csv'.format(int(round(np.rad2deg(theta_los)))), mode='w', newline='') as file:
         writer = csv.writer(file)
         if model_id == 1 or model_id == 2:
@@ -331,23 +165,9 @@ def save_data(jet, wind, theta_los, phi_los, path='./', model_id=0):
     return
 
 def coord_grid(n_theta, n_phi, theta_bounds, phi_bounds):
-    """
-    Generates a grid of spherical coordinates (theta, phi).
-
-    Args:
-        n_theta (int): Number of theta (polar angle) grid points.
-        n_phi (int): Number of phi (azimuthal angle) grid points.
-        theta_bounds (list or tuple): Range of theta (polar angle) values [theta_min, theta_max] in radians.
-        phi_bounds (list or tuple): Range of phi (azimuthal angle) values [phi_min, phi_max] in radians.
-
-    Returns:
-        tuple: theta (columns) and phi (rows) meshgrids.
-    """
-    # Uniform parameter u in [0,1]
+    """Build the spherical edge grid used by the outflow meshes."""
     u = np.linspace(0, 1, n_theta)
     alpha = 3
-    
-    # Symmetric tanh mapping
     theta = 0.5*np.pi * (1 + np.tanh(alpha*(2*u-1)) / np.tanh(alpha))    
 
     phi = np.linspace(phi_bounds[0], phi_bounds[1], n_phi)
@@ -356,22 +176,9 @@ def coord_grid(n_theta, n_phi, theta_bounds, phi_bounds):
     return TH, PH
 
 def gamma_grid(g0, theta, phi, struct='tophat', theta_jet=np.deg2rad(5), cutoff=None, **kwargs):
-    """
-    Generates grid of Lorentz factors based on given structure type.
+    """Build a Lorentz-factor grid for the requested angular structure."""
 
-    Args:
-        g0 (float): Lorentz factor normalization.
-        theta (2D array): Meshgrid of polar angles (radians).
-        struct (str or callable): 'tophat', 'gaussian', 'powerlaw', or a custom function.
-        theta_jet (float, optional): Core angle (radians) for Gaussian or power-law. Defaults to 5 deg.
-        cutoff (float, optional): Angle beyond which Gamma is set to 1.
-        kwargs: Additional parameters like 'k' for power-law exponent.
-
-    Returns:
-        2D array: Lorentz factor grid.
-    """
-
-    struct_map = {1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
+    struct_map = {0: 'tophat', 1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
     if callable(struct):
         struct = struct
     elif struct in struct_map:
@@ -397,20 +204,9 @@ def gamma_grid(g0, theta, phi, struct='tophat', theta_jet=np.deg2rad(5), cutoff=
     return g
 
 def eps_grid(eps0, theta, phi, struct='tophat', theta_jet=np.radians(5), cutoff=np.radians(90), **kwargs):
-    """
-    Generates grid of energy per solid angle (eps) with optional counter jet.
+    """Build an energy or luminosity-per-solid-angle grid."""
 
-    Parameters:
-        eps0 (float): normalization
-        theta, phi (ndarray): grid of polar and azimuthal angles
-        struct (str or callable): 'tophat', 'gaussian', 'powerlaw', or a callable
-        theta_jet (float): core angle for Gaussian/PL
-        k (float): power-law index if struct='powerlaw'
-        cutoff (float): cutoff angle beyond which eps=0
-        **kwargs: additional args passed to callable struct
-    """
-
-    struct_map = {1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
+    struct_map = {0: 'tophat', 1: 'tophat', 2: 'gaussian', 3: 'powerlaw'}
     if callable(struct):
         struct = struct
     elif struct in struct_map:
@@ -434,69 +230,46 @@ def eps_grid(eps0, theta, phi, struct='tophat', theta_jet=np.radians(5), cutoff=
     return eps
 
 
-def obs_grid(eps, e_iso_grid, amati_a=0.41, amati_b=0.83, e_1=0.3e3, e_2=10e3, tau_1=0.1, tau_2=0.35):
-    """
-    Computes the spectrum and light curve observed by an observer on a grid.
+# def radiation_field(model, eps, e_iso_grid, E, t):
 
-    This function calculates the observed spectrum and light curve at each grid based on the intrinsic energy per solid angle grid 
-    (eps) and observed isotropic energy grid (e_iso_grid). It uses the Amati relation to determine the peak energy 
-    (E_p) of the Band spectra, each normalized such that the integral equals eps. The light curve at each grid is modeled 
-    using a FRED function, each normalized such that the integral equals eps.
+#     rad = Radiation(model)
 
-    Args:
-        eps (2D array): Energy per solid angle grid values.
-        e_iso_grid (2D array): Isotropic energy grid values for each grid point.
-        amati_a (float): Amati relation slope used to calculate the peak energy.
-        amati_b (float): Amati relation intercept used to calculate the peak energy.
-        e_1 (float): Minimum energy for the spectrum integration, default is 0.3 keV.
-        e_2 (float): Maximum energy for the spectrum integration, default is 10 keV.
+#     EN_E = rad.spectrum(E, eps, e_iso_grid)
+#     L = rad.light_curve(t, None)  # depends on your design
 
-    Returns:
-        tuple: A tuple containing the following arrays:
-            - E (array): Energy grid used for the spectrum integration.
-            - N_E_norm (array): Normalized Band spectrum.
-            - t (array): Time grid adjusted to the observer frame for the light curve.
-            - L_scaled (array): Scaled light curve.
-            - S (array): Integrated spectrum over the detector energy band.
-    """
-    # SPECTRUM
-    # Reference Band function parameters
-    alpha, beta = -1, -2.3
-    E_p = 1e5 * 10**(amati_a * np.log10(e_iso_grid / 1e51) + amati_b)
+#     return EN_E, L
 
-    # Calculate the peak and cutoff energy based on the Amati relation
-    # E_p = E_p_0 * (e_iso_grid / e_iso_grid[0])**amati_index
-    E_0 = E_p / (2 + alpha)
+def observed_emission(model, eps, e_iso_grid, E, t,
+             amati_a=0.41, amati_b=0.83,
+             e_1=0.3e3, e_2=10e3,
+             tau_1=0.1, tau_2=0.35):
+    """Construct per-cell spectra, light curves, and band-limited fluence."""
+    class _ObservedEmissionOutflow:
+        pass
 
-    # Define the energy grid for the spectrum integration
-    E = np.geomspace(1e2, 1e8, 1000)
+    outflow = _ObservedEmissionOutflow()
+    outflow.eps = eps
+    outflow.e_iso_grid = e_iso_grid
 
-    # Compute the unnormalized Band energy spectrum, EN(E)
-    EN_E = E * band(E, alpha, beta, E_0)
+    NE_kernel = model.build_spectrum_kernel(E, outflow)
+    L_kernel = model.build_light_curve_kernel(t, outflow)
 
-    # Normalize spectrum to eps
-    eps_unit = int_spec(E, EN_E, E_min=1e3, E_max=10e6)
+    eps_unit = int_spec(E, E * NE_kernel, E_min=1e3, E_max=10e6)
     mask = eps_unit > 0
     A_spec = np.zeros_like(eps)
     A_spec[mask] = eps[mask] / eps_unit[mask]
-    EN_E_norm = A_spec[..., np.newaxis] * EN_E 
+    EN_E = A_spec[..., np.newaxis] * E * NE_kernel
 
-    # Integrate spectra of emitting regions over detector energy band
-    S = int_spec(E, EN_E_norm, E_min=e_1, E_max=e_2)
+    S = int_spec(E, EN_E, E_min=e_1, E_max=e_2)
     S = np.nan_to_num(S, nan=0.0)
 
-    # Generate FRED light curve
-    t = np.geomspace(1e-3, 1e4, 1000)
-    L = fred(t, tau_1, tau_2)
+    S_unit = int_lc(t, L_kernel)
+    L = (S / S_unit)[..., np.newaxis] * L_kernel
 
-    # Normalize time-integrated Luminosity
-    S_unit = int_lc(t, L)
-    A_lc = S / S_unit
-    L_scaled = A_lc[..., np.newaxis] * L
-
-    return E, EN_E_norm, t, L_scaled, S
+    return EN_E, L, S
 
 def calc_e_iso_grid(theta, phi, g, eps, theta_cut, dOmega):
+    """Compute isotropic-equivalent energy as a function of viewing angle."""
     n_theta = theta.shape[0]
     E_iso_grid = np.zeros(n_theta)
     D_on = doppf(g, 0)
@@ -533,46 +306,64 @@ def calc_e_iso_grid(theta, phi, g, eps, theta_cut, dOmega):
 
     return E_iso_grid
 
+def calc_L_iso_grid(theta, phi, g, dL_dOmega, theta_cut, dOmega):
+    """Compute isotropic-equivalent luminosity as a function of viewing angle."""
+    n_theta = theta.shape[0]
+    dL_dOmega_grid = np.zeros(n_theta)
+    D_on = doppf(g, 0)
+    dOmega_sum = np.sum(dOmega)
+
+    th = theta[:, 0]
+    ph = phi[0, :]
+
+    cos_theta_v = (
+        np.cos(th)[:, None, None] * np.cos(th)[None, :, None] +
+        np.sin(th)[:, None, None] * np.sin(th)[None, :, None] *
+        np.cos(ph)[None, None, :]
+    )
+    theta_v = np.arccos(np.clip(cos_theta_v, -1.0, 1.0))
+
+    mask_jet = theta_v <= theta_cut
+    mask_counter = theta_v >= (np.pi - theta_cut)
+
+    R_D_jet = doppf(g[None, :, :], theta_v) / D_on[None, :, :]
+    R_D_counter = doppf(g[None, :, :], np.pi - theta_v) / D_on[None, :, :]
+
+    eps_b = dL_dOmega[None, :, :]
+    dOmega_b = dOmega[None, :, :]
+
+    dL_dOmega_jet = 2 * np.pi * np.sum(eps_b * R_D_jet**4 * dOmega_b * mask_jet, axis=(1, 2)) / (dOmega_sum)
+    dL_dOmega_counter = 2 * np.pi * np.sum(eps_b * R_D_counter**4 * dOmega_b * mask_counter, axis=(1, 2)) / (dOmega_sum)
+
+    dL_dOmega_grid = (dL_dOmega_jet + dL_dOmega_counter)
+
+    dL_dOmega_grid = np.minimum(dL_dOmega_grid, dL_dOmega_grid[0])
+    dL_dOmega_grid = np.maximum(dL_dOmega_grid, 1e-30)
+
+    dL_dOmega_grid = np.tile(dL_dOmega_grid[:, np.newaxis], (1, phi.shape[1]))
+
+    return dL_dOmega_grid
+
 def profile_interp(orig_theta, orig_phi, orig_profile, theta_rot, phi_rot, method='nearest'):
-    """
-    Interpolate a profile defined on spherical coordinates onto a rotated grid
-    using 3D Cartesian coordinates.
-    """
-    # --- Step 1: Convert original cell centers to Cartesian ---
+    """Interpolate a spherical profile onto a rotated spherical grid."""
     x = np.sin(orig_theta) * np.cos(orig_phi)
     y = np.sin(orig_theta) * np.sin(orig_phi)
     z = np.cos(orig_theta)
     points_xyz = np.column_stack([x.ravel(), y.ravel(), z.ravel()])
     
-    # --- Step 2: Convert rotated grid to Cartesian ---
     x_rot = np.sin(theta_rot) * np.cos(phi_rot)
     y_rot = np.sin(theta_rot) * np.sin(phi_rot)
     z_rot = np.cos(theta_rot)
     points_rot_xyz = np.column_stack([x_rot.ravel(), y_rot.ravel(), z_rot.ravel()])
     
-    # --- Step 3: Interpolate in 3D ---
     rotated_profile = griddata(points_xyz, orig_profile.ravel(), points_rot_xyz, method=method, fill_value=0.0)
     
     return rotated_profile.reshape(theta_rot.shape)
 
 def rotate_spherical(theta, phi, theta_target, phi_target):
     """
-    Rotate spherical coordinates so that the north pole aligns with (theta_target, phi_target).
-
-    Parameters
-    ----------
-    theta, phi : array_like
-        Input spherical coordinates (can be scalars, 1D arrays, or 2D meshgrids).
-    theta_target, phi_target : float
-        Target spherical coordinates to rotate the north pole onto.
-
-    Returns
-    -------
-    theta_rot, phi_rot : array_like
-        Rotated spherical coordinates (same shape as input).
+    Rotate spherical coordinates so the pole points at a target direction.
     """
-
-    # --- Step 1: Rotation matrix ---
     target_vec = np.array([
         np.sin(theta_target) * np.cos(phi_target),
         np.sin(theta_target) * np.sin(phi_target),
@@ -592,23 +383,21 @@ def rotate_spherical(theta, phi, theta_target, phi_target):
                       [-rot_axis[1], rot_axis[0], 0]])
         R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
 
-    # --- Step 2: Cartesian from spherical ---
     x = np.sin(theta) * np.cos(phi)
     y = np.sin(theta) * np.sin(phi)
     z = np.cos(theta)
     xyz = np.stack([x, y, z], axis=-1)
 
-    # --- Step 3: Rotate ---
     xyz_rot = xyz @ R.T
     x_rot, y_rot, z_rot = xyz_rot[..., 0], xyz_rot[..., 1], xyz_rot[..., 2]
 
-    # --- Step 4: Back to spherical ---
     theta_rot = np.arccos(np.clip(z_rot, -1.0, 1.0))
     phi_rot = np.arctan2(y_rot, x_rot) % (2*np.pi)
 
     return theta_rot, phi_rot
 
 def calc_t90(t, L, z=1, windows=[0.064,0.256,1,4,8], F_lim_1s=2.8e-8):
+    """Estimate T90 and trigger detectability from a bolometric light curve."""
 
     if len(t) < 2:
         return np.nan, False, 0.0
