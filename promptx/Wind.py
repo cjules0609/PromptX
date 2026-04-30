@@ -6,7 +6,7 @@
 #                                                                               #
 # ============================================================================= #
 #   PromptX - Prompt X-ray emission modeling of relativistic outflows           #
-#   Version 0.2                                                                 #
+#   Version 0.3                                                                 #
 #   Author: Connery Chen, Yihan Wang, and Bing Zhang                            #
 #   License: MIT                                                                #
 # ============================================================================= # 
