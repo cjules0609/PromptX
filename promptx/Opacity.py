@@ -33,7 +33,7 @@ class Opacity:
     def angular_profile(self, theta):
         """Return the angular opacity mask."""
         return np.where(
-            np.abs(theta - np.pi/2) < self.theta_cut,
+            np.abs(theta - np.pi/2) > self.theta_cut,
             1.0,
             0.0
         )
