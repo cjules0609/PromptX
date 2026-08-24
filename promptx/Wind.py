@@ -41,6 +41,8 @@ class Wind(Outflow):
         self.beta = gamma2beta(self.g)
         self.D_on = doppf(self.g, 0)
 
+        self.structure = self.dL_dOmega
+
     def define(self, g0=50, L0=1e48, wind_struct=1, **kwargs):
         """
         Build the intrinsic wind luminosity and Lorentz-factor fields.
