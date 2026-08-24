@@ -252,7 +252,7 @@ def observed_emission(model, eps, e_iso_grid, E, t,
     outflow.e_iso_grid = e_iso_grid
 
     NE_kernel = model.build_spectrum_kernel(E, outflow)
-    L_kernel = model.build_light_curve_kernel(t, outflow)
+    L_kernel = model.build_temporal_kernel(t, outflow)
 
     eps_unit = int_spec(E, E * NE_kernel, E_min=1e3, E_max=10e6)
     mask = eps_unit > 0
@@ -268,81 +268,45 @@ def observed_emission(model, eps, e_iso_grid, E, t,
 
     return EN_E, L, S
 
-def calc_e_iso_grid(theta, phi, g, eps, theta_cut, dOmega):
-    """Compute isotropic-equivalent energy as a function of viewing angle."""
-    n_theta = theta.shape[0]
-    E_iso_grid = np.zeros(n_theta)
-    D_on = doppf(g, 0)
-    dOmega_sum = np.sum(dOmega)
+def calc_E_iso_grid(theta, phi, g, eps, dOmega):
+    """Compute isotropic-equivalent energy as a function of viewing angle (phi-independent)."""
 
     th = theta[:, 0]
-    ph = phi[0, :]
+    phi_los = phi[0, 0]
 
-    cos_theta_v = (
-        np.cos(th)[:, None, None] * np.cos(th)[None, :, None] +
-        np.sin(th)[:, None, None] * np.sin(th)[None, :, None] *
-        np.cos(ph)[None, None, :]
-    )
-    theta_v = np.arccos(np.clip(cos_theta_v, -1.0, 1.0))
+    D_on = doppf(g, 0)
 
-    mask_jet = theta_v <= theta_cut
-    mask_counter = theta_v >= (np.pi - theta_cut)
-
-    R_D_jet = doppf(g[None, :, :], theta_v) / D_on[None, :, :]
-    R_D_counter = doppf(g[None, :, :], np.pi - theta_v) / D_on[None, :, :]
-
-    eps_b = eps[None, :, :]
-    dOmega_b = dOmega[None, :, :]
-
-    E_iso_jet = 2 * np.pi * np.sum(eps_b * R_D_jet**3 * dOmega_b * mask_jet, axis=(1, 2)) / (dOmega_sum)
-    E_iso_counter = 2 * np.pi * np.sum(eps_b * R_D_counter**3 * dOmega_b * mask_counter, axis=(1, 2)) / (dOmega_sum)
-
-    E_iso_grid = (E_iso_jet + E_iso_counter)
+    E_iso_grid = np.array([
+        4 * np.pi * np.sum(
+            eps * (doppf(g, angular_d(theta_los, theta, phi_los, phi)) / D_on)**3 * dOmega
+            ) / np.sum(dOmega)
+        for theta_los in th
+    ])
 
     E_iso_grid = np.minimum(E_iso_grid, E_iso_grid[0])
     E_iso_grid = np.maximum(E_iso_grid, 1e-30)
 
-    E_iso_grid = np.tile(E_iso_grid[:, np.newaxis], (1, phi.shape[1]))
+    return np.tile(E_iso_grid[:, None], (1, phi.shape[1]))
 
-    return E_iso_grid
-
-def calc_L_iso_grid(theta, phi, g, dL_dOmega, theta_cut, dOmega):
-    """Compute isotropic-equivalent luminosity as a function of viewing angle."""
-    n_theta = theta.shape[0]
-    dL_dOmega_grid = np.zeros(n_theta)
-    D_on = doppf(g, 0)
-    dOmega_sum = np.sum(dOmega)
+def calc_L_iso_grid(theta, phi, g, dL_dOmega, dOmega):
+    """Compute isotropic-equivalent luminosity as a function of viewing angle (phi-independent)."""
 
     th = theta[:, 0]
-    ph = phi[0, :]
+    phi_los = phi[0, 0]
 
-    cos_theta_v = (
-        np.cos(th)[:, None, None] * np.cos(th)[None, :, None] +
-        np.sin(th)[:, None, None] * np.sin(th)[None, :, None] *
-        np.cos(ph)[None, None, :]
-    )
-    theta_v = np.arccos(np.clip(cos_theta_v, -1.0, 1.0))
+    D_on = doppf(g, 0)
 
-    mask_jet = theta_v <= theta_cut
-    mask_counter = theta_v >= (np.pi - theta_cut)
-
-    R_D_jet = doppf(g[None, :, :], theta_v) / D_on[None, :, :]
-    R_D_counter = doppf(g[None, :, :], np.pi - theta_v) / D_on[None, :, :]
-
-    eps_b = dL_dOmega[None, :, :]
-    dOmega_b = dOmega[None, :, :]
-
-    dL_dOmega_jet = 2 * np.pi * np.sum(eps_b * R_D_jet**4 * dOmega_b * mask_jet, axis=(1, 2)) / (dOmega_sum)
-    dL_dOmega_counter = 2 * np.pi * np.sum(eps_b * R_D_counter**4 * dOmega_b * mask_counter, axis=(1, 2)) / (dOmega_sum)
-
-    dL_dOmega_grid = (dL_dOmega_jet + dL_dOmega_counter)
+    dL_dOmega = np.array([
+        4 * np.pi * np.sum(
+            dL_dOmega * (doppf(g, angular_d(theta_los, theta, phi_los, phi)) / D_on)**4 * dOmega
+            ) / np.sum(dOmega)
+        for theta_los in th
+    ])
 
     dL_dOmega_grid = np.minimum(dL_dOmega_grid, dL_dOmega_grid[0])
     dL_dOmega_grid = np.maximum(dL_dOmega_grid, 1e-30)
 
-    dL_dOmega_grid = np.tile(dL_dOmega_grid[:, np.newaxis], (1, phi.shape[1]))
-
-    return dL_dOmega_grid
+    return np.tile(dL_dOmega_grid[:, np.newaxis], (1, phi.shape[1]))
 
 def profile_interp(orig_theta, orig_phi, orig_profile, theta_rot, phi_rot, method='nearest'):
     """Interpolate a spherical profile onto a rotated spherical grid."""

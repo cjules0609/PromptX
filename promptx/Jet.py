@@ -37,6 +37,8 @@ class Jet(Outflow):
         self.beta = gamma2beta(self.g)
         self.D_on = doppf(self.g, 0)
 
+        self.structure = self.eps
+
     def define(self, g0, eps0, jet_struct, **kwargs):
         """
         Build the intrinsic jet energy and Lorentz-factor fields.
@@ -87,7 +89,7 @@ class Jet(Outflow):
         eps = self.eps.copy()
 
         # Initial E_iso calculation and normalization (2D)
-        e_iso_grid = calc_e_iso_grid(self.theta, self.phi, g, eps, self.theta_cut, self.dOmega)
+        e_iso_grid = calc_E_iso_grid(self.theta, self.phi, g, eps, self.dOmega)
         A = E_iso / e_iso_grid[0, 0]
         eps *= A
 
@@ -100,7 +102,7 @@ class Jet(Outflow):
             g_old = g.copy()
 
             # 1. Compute E_iso grid (2D)
-            e_iso_grid = calc_e_iso_grid(self.theta, self.phi, g, eps, self.theta_cut, self.dOmega)
+            e_iso_grid = calc_E_iso_grid(self.theta, self.phi, g, eps, self.dOmega)
 
             # 2. Update Gamma with under-relaxation
             g_new = lg11(e_iso_grid, self.theta, self.theta_cut)
@@ -120,7 +122,7 @@ class Jet(Outflow):
         else:
             print("Warning: did not converge")
 
-        e_iso_grid = calc_e_iso_grid(self.theta, self.phi, g, eps, self.dOmega)
+        e_iso_grid = calc_E_iso_grid(self.theta, self.phi, g, eps, self.dOmega)
 
         # Save results
         self.g = g
@@ -129,28 +131,6 @@ class Jet(Outflow):
         self.eps = eps
         self.e_iso_grid = e_iso_grid
         self.E_iso = e_iso_grid[0, 0]
-
-    def radiation(self, model=None):
-
-        self.E = np.geomspace(1e2, 1e8, 1000)
-        self.t = np.geomspace(1e-3, 1e4, 1000)
-
-        NE_kernel = model.spectrum_kernel(self.E, self.e_iso_grid)
-        L_kernel = model.light_curve_kernel(self.t)
-
-        eps_unit = int_spec(self.E, self.E * NE_kernel, E_min=1e3, E_max=10e6)
-        mask = eps_unit > 0
-        A_spec = np.zeros_like(self.eps)
-        A_spec[mask] = self.eps[mask] / eps_unit[mask]
-
-        self.N_E = A_spec[..., np.newaxis] * NE_kernel    
-
-        self.S = int_spec(self.E, self.E * self.N_E, E_min=1e3, E_max=10e6)
-        self.S = np.nan_to_num(self.S, nan=0.0)
-    
-        S_unit = int_lc(self.t, L_kernel)
-        A_lc = self.S / S_unit
-        self.L = A_lc[..., np.newaxis] * L_kernel
 
     def refine_grid(self, theta_los, phi_los, n_theta=200, n_phi=100, rotate=False, resample=False):
         """Rotate or downsample the jet grid around a given line of sight."""
@@ -192,7 +172,7 @@ class Jet(Outflow):
             )
 
             g_rot = lg11(e_iso_rot)
-            e_iso_rot = calc_e_iso_grid(
+            e_iso_rot = calc_E_iso_grid(
                 theta_rot, phi_rot, g_rot, eps_rot,
                 theta_jet=self.theta_jet,
                 dOmega=self.dOmega
