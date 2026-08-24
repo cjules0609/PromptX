@@ -90,12 +90,12 @@ class Wind(Outflow):
         dL_dOmega = self.dL_dOmega.copy()
 
         # Initial E_iso calculation and normalization (2D)
-        L_iso_grid = calc_L_iso_grid(self.theta, self.phi, self.g, dL_dOmega, self.theta_cut, self.dOmega)
+        L_iso_grid = calc_L_iso_grid(self.theta, self.phi, self.g, dL_dOmega, self.dOmega)
 
         A = L0 / L_iso_grid[0, 0]
         dL_dOmega *= A
 
-        L_iso_grid = calc_L_iso_grid(self.theta, self.phi, self.g, dL_dOmega, self.theta_cut, self.dOmega)
+        L_iso_grid = calc_L_iso_grid(self.theta, self.phi, self.g, dL_dOmega, self.dOmega)
 
         self.dL_dOmega = dL_dOmega
 
