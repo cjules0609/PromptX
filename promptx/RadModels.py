@@ -14,33 +14,17 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from promptx.const import G, c
+from promptx.const import G, c, q, m_e, sigma_T, m_p
 from promptx.helper import band, fred
 
 class RadiationModel:
     """Abstract interface for source-frame radiation prescriptions."""
 
-    def build_spectrum_kernel(self, E, outflow, **kwargs):
-        """Return the spectral kernel on the outflow grid."""
+    def __call__(self, E, outflow, **kwargs):
+        """Return spectral shape S(E) per patch."""
         raise NotImplementedError
 
-    def build_light_curve_kernel(self, t, outflow, **kwargs):
-        """Return the temporal kernel on the requested time grid."""
-        raise NotImplementedError
-
-    def spectrum_normalization(self, outflow, **kwargs):
-        """Return the per-cell spectral normalization field."""
-        raise NotImplementedError
-
-    def light_curve_normalization(self, outflow, spectral_energy, **kwargs):
-        """Return the per-cell light-curve normalization field."""
-        return spectral_energy
-
-    def light_curve_norm_mode(self):
-        """Return the light-curve normalization convention."""
-        return "integral"
-
-class Phenomenological(RadiationModel):
+class Band(RadiationModel):
     """Band-spectrum plus FRED light-curve prompt-emission model."""
 
     def __init__(self,
@@ -56,7 +40,7 @@ class Phenomenological(RadiationModel):
         self.tau_1 = tau_1
         self.tau_2 = tau_2
 
-    def build_spectrum_kernel(self, E, outflow, **kwargs):
+    def __call__(self, E, outflow, **kwargs):
         """Build the Band spectral kernel from the Amati relation."""
         e_iso_grid = outflow.e_iso_grid
 

@@ -13,7 +13,6 @@
 
 import numpy as np
 from promptx.helper import (
-    nearest_coord,
     angular_d,
     doppf,
     interp_lc,
