@@ -36,14 +36,13 @@ class Observer:
 
         outflow = self.outflow
 
-        self.los_coord = nearest_coord(
-            outflow.theta, outflow.phi, theta_los, phi_los
-        )
+        self.theta_los = theta_los
+        self.phi_los = phi_los
 
         self.theta_obs = angular_d(
-            outflow.theta[self.los_coord[0], 0],
+            theta_los,
             outflow.theta,
-            outflow.phi[0, self.los_coord[1]],
+            phi_los,
             outflow.phi
         )
 
