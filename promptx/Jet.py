@@ -120,6 +120,8 @@ class Jet(Outflow):
         else:
             print("Warning: did not converge")
 
+        e_iso_grid = calc_e_iso_grid(self.theta, self.phi, g, eps, self.dOmega)
+
         # Save results
         self.g = g
         self.beta = gamma2beta(self.g)
