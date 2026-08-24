@@ -296,7 +296,7 @@ def calc_L_iso_grid(theta, phi, g, dL_dOmega, dOmega):
 
     D_on = doppf(g, 0)
 
-    dL_dOmega = np.array([
+    dL_dOmega_grid = np.array([
         4 * np.pi * np.sum(
             dL_dOmega * (doppf(g, angular_d(theta_los, theta, phi_los, phi)) / D_on)**4 * dOmega
             ) / np.sum(dOmega)
