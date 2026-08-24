@@ -24,7 +24,7 @@ class Jet(Outflow):
                  theta_jet=np.pi/2, theta_cut=np.pi/2,
                  jet_struct=0, **kwargs):
 
-        super().__init__()
+        super().__init__(n_theta=n_theta, n_phi=n_phi)
 
         self.theta_jet = theta_jet
         self.theta_cut = theta_cut
